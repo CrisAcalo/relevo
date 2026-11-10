@@ -8,6 +8,10 @@
 - agy usa solo modelos Google: `gemini-3.8-flash-high` por defecto para todo, incluido el trabajo delicado. Argon (`gemini-4-argon-*`) tiene un cupo semanal propio, separado y más limitado: solo si Flash High falla dos veces la misma tarea o para diseño crítico del núcleo, justificándolo antes en el chat y acotando los archivos que puede leer. No usar modelos Claude ni GPT dentro de agy.
 - Las capturas de interfaz se analizan con un agente en rol `vision` (skill `auditar-capturas`), no en la ventana de contexto de Claude.
 
+## Por qué
+
+El origen de cada regla de este flujo, de la puerta de permisos, de `relevo check` y del lanzador está en [por-que-cada-regla.md](../por-que-cada-regla.md); los fallos reales que las motivaron, con síntoma, causa y regla resultante, en [incidentes.md](../incidentes.md).
+
 ## Ejecución
 
 - El lanzador (`relevo run` / `npm run agent:run`) se ejecuta **SIEMPRE desde la raíz del repositorio principal, nunca desde un worktree**; `--cwd` debe existir y apuntar al worktree (el lanzador lo rechaza en ambos casos si no se cumple).
