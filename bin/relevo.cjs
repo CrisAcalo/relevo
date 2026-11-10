@@ -2,13 +2,14 @@
 'use strict';
 /*
  * relevo: Claude planifica y audita; agentes de otros proveedores ejecutan.
+ *   relevo init [--dry-run] [--force] (inicializa la configuración y plantillas en un proyecto git)
  *   relevo run --provider agy --role coder --model <m> --task <t> --cwd <dir> --brief <archivo>
  *   relevo watch [--once | --list | <NN>]
  *   relevo quota [--json]
  *   relevo check            (definición de hecho mecánica sobre la rama actual)
  */
 const path = require('node:path');
-const COMMANDS = { run: 'run.cjs', watch: 'watch.cjs', quota: 'quota.cjs', check: 'check-change.cjs' };
+const COMMANDS = { init: 'init.cjs', run: 'run.cjs', watch: 'watch.cjs', quota: 'quota.cjs', check: 'check-change.cjs' };
 const [command, ...rest] = process.argv.slice(2);
 if (!COMMANDS[command]) {
   console.error(`relevo · comando desconocido "${command ?? ''}". Usa: ${Object.keys(COMMANDS).join(', ')}`);

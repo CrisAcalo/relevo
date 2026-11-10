@@ -1,13 +1,19 @@
 /* Antigravity (agy) repository permission gate. No agent, network or browser is used. */
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const gatePath = path.resolve(__dirname, '../.agents/hooks/permission-gate.cjs');
-const { decide } = require(gatePath);
+const gatePath = path.resolve(__dirname, '../lib/permission-gate.cjs');
+const { decide, DEFAULTS_GATE } = require(gatePath);
+const { DEFAULTS } = require('../lib/config.cjs');
 const B = String.fromCharCode(92);
 // Entorno explícito: la prueba no debe depender del AGY_ROLE del proceso que la ejecuta (p. ej. un agente con rol qa).
-const run = (command, name = 'run_command') => decide({ toolCall: { name, args: { CommandLine: command } } }, {}).decision;
+const run = (command, name = 'run_command') => decide({
+  toolCall: { name, args: { CommandLine: command } },
+  workspacePaths: ['C:/Proyectos/Personal/GeneradorMusica'],
+}, {}).decision;
 
 const failures = [];
 let passed = 0;
@@ -73,7 +79,7 @@ test('edits are scoped by role passed in AGY_ROLE', () => {
   // documentalista: solo documentación
   assert.equal(edit('docs', root + 'docs/publishing-roadmap.md'), 'allow');
   assert.equal(edit('docs', root + 'AGENTS.md'), 'allow');
-  assert.equal(edit('docs', root + '.claude/skills/verificar-cambio/SKILL.md'), 'allow');
+  assert.equal(edit('docs', root + 'README.md'), 'allow');
   assert.equal(edit('docs', root + 'package.json'), 'deny');
   assert.equal(edit('docs', root + 'src/App.svelte', 'write_to_file'), 'deny');
   // QA: veredicto, artefactos y mutaciones temporales; nunca package.json ni docs
@@ -99,6 +105,122 @@ test('hook process prints a JSON decision and never fails on malformed input', (
   const bad = spawnSync(process.execPath, [gatePath], { input: '{not json', env, encoding: 'utf8' });
   assert.equal(bad.status, 0);
   assert.equal(JSON.parse(bad.stdout).decision, 'ask');
+});
+
+test('la ruta absoluta del proyecto original ya NO se trata como interna cuando la puerta está instalada en otro repo; rutas internas sí', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-repo-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  // La ruta del proyecto original ahora es externa al tempRepo -> ask
+  const oldRepoCommand = 'Get-Content C:' + B + 'Proyectos' + B + 'Personal' + B + 'GeneradorMusica' + B + 'src' + B + 'x.ts';
+  const oldRepoRes = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: oldRepoCommand } } }, {});
+  assert.equal(oldRepoRes.decision, 'ask');
+
+  // Una ruta dentro de tempRepo sí se permite
+  const internalCommand = 'Get-Content ' + path.join(tempRepo, 'src', 'x.ts');
+  const internalRes = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: internalCommand } } }, {});
+  assert.equal(internalRes.decision, 'allow');
+
+  // Limpieza
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('npmScripts: ["test"] permite npm test y deja en ask npm run build', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-npm-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+    gate: { npmScripts: ['test'] },
+  }));
+
+  const testRes = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'npm test' } } }, {});
+  assert.equal(testRes.decision, 'allow');
+
+  const buildRes = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'npm run build' } } }, {});
+  assert.equal(buildRes.decision, 'ask');
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('scriptsDirs: ["tools"] permite node tools/a.cjs y deja en ask node scripts/a.cjs', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-scripts-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+    gate: { scriptsDirs: ['tools'] },
+  }));
+
+  const toolsRes = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'node tools/a.cjs' } } }, {});
+  assert.equal(toolsRes.decision, 'allow');
+
+  const scriptsRes = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'node scripts/a.cjs' } } }, {});
+  assert.equal(scriptsRes.decision, 'ask');
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('roleScopes personalizado aplica', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-roles-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+    gate: { roleScopes: { customRole: ['^custom/'] } },
+  }));
+
+  const allowedEdit = tempDecide({
+    toolCall: { name: 'replace_file_content', args: { Path: path.join(tempRepo, 'custom/file.txt') } },
+  }, { AGY_ROLE: 'customRole' });
+  assert.equal(allowedEdit.decision, 'allow');
+
+  const deniedEdit = tempDecide({
+    toolCall: { name: 'replace_file_content', args: { Path: path.join(tempRepo, 'src/file.txt') } },
+  }, { AGY_ROLE: 'customRole' });
+  assert.equal(deniedEdit.decision, 'deny');
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('configuración inválida → deny', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-invalid-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), '{ invalid json');
+
+  const res = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'git status' } } }, {});
+  assert.equal(res.decision, 'deny');
+  assert.ok(res.reason.includes('Configuración inválida en relevo.config.json'));
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+    gate: { npmScripts: 123 },
+  }));
+  const res2 = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'git status' } } }, {});
+  assert.equal(res2.decision, 'deny');
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('los valores por defecto de la puerta coinciden con DEFAULTS.gate de lib/config.cjs', () => {
+  assert.deepEqual(DEFAULTS_GATE, DEFAULTS.gate);
 });
 
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);

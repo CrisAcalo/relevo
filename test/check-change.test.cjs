@@ -10,7 +10,32 @@ function test(name, action) {
 }
 const head = 'a'.repeat(40);
 const approved = { commit: head, verdict: 'aprobado', suites: [{ name: 'verify', passed: true }] };
-const base = { agentsMd: '| [17-cover-export.md](docs/decisions/17-cover-export.md) |', head, dirty: [] };
+
+const legacyCheck = {
+  baseBranch: 'main',
+  sourcePattern: '^src/',
+  testPattern: '^(scripts/test-[\\w.-]+\\.cjs|test/[\\w./-]+)$',
+  roadmap: 'docs/publishing-roadmap.md',
+  decisions: { dir: 'docs/decisions', index: 'AGENTS.md' },
+  verdictFile: '.qa-verdict.json',
+  hardcodedColorFiles: '^src/(components/[\\w.-]+\\.svelte|App\\.svelte)$',
+  areaSuites: [
+    { pattern: '^src/audio/(Lofi|Generative|Hook|SongStructure|PhonkScales|MusicalArrangement|Random|SeededRandom)', suites: ['npm run test:lofi:e2e', 'node scripts/test-composition-state-e2e.cjs'] },
+    { pattern: '^src/audio/(AudioExporter|AudioRender|OfflineRender|RenderPolicy|OfflineVoice|AudioGraph|OrderedAudioMixer|TrackChannelGraph)', suites: ['npm run test:render -- --lifecycle-only', 'npm run test:production'] },
+    { pattern: '^src/audio/(Video|OfflineVideo|SoftwareH264)', suites: ['npm run test:video-fallback', 'npm run test:local-video'] },
+    { pattern: '^src/visualizer/', suites: ['npm run test:visual-motion', 'npm run test:visual-neon'] },
+    { pattern: '^src/project/', suites: ['node scripts/test-project-storage-e2e.cjs'] },
+    { pattern: '^src/studio/(StudioTransport|StudioSession)|^src/components/PlaybackTransport', suites: ['npm run test:playback'] },
+    { pattern: '^src/studio/Cover|^src/components/SongArtwork', suites: ['npm run test:cover', 'npm run test:design'] },
+    { pattern: '^src/project/ReleaseSettings|^src/studio/ReleaseDocuments', suites: ['npm run test:release', 'node scripts/test-project-storage-e2e.cjs'] },
+    { pattern: '^src/project/Catalog|^src/studio/(CatalogController|CompositionNovelty)|^src/components/ReleaseCatalog', suites: ['npm run test:catalog', 'node scripts/test-project-storage-e2e.cjs'] },
+    { pattern: '^src/(components/|App\\.svelte|app\\.css|styles/)', suites: ['npm run test:design', 'npm run test:interface'] },
+    { pattern: '^src/(App\\.svelte|project/(ProjectState|ProjectAutosave|ProjectRepository|ProjectStorage))', suites: ['node scripts/test-studio-e2e.cjs', 'node scripts/test-composition-state-e2e.cjs'] },
+    { pattern: '^src/(visualizer/|components/VisualizerCanvas|audio/(SamplerEngine|Bass808Synth|DrumSynth|AudioEngine|AudioGraph|MixSettings|TrackChannelGraph|LofiKeys|SynthesisRecipe))', suites: ['npm run test:visual-motion', 'npm run test:visual-neon', 'npm run test:playback', 'node scripts/test-studio-e2e.cjs'] },
+  ],
+};
+
+const base = { agentsMd: '| [17-cover-export.md](docs/decisions/17-cover-export.md) |', head, dirty: [], check: legacyCheck };
 
 test('a complete change passes', () => {
   const r = evaluate({ ...base, verdict: approved, changed: ['src/studio/CoverArt.ts', 'scripts/test-cover-art.cjs', 'docs/publishing-roadmap.md', 'docs/decisions/17-cover-export.md'] });
@@ -86,6 +111,47 @@ test('an approved verdict with high-severity findings fails; medium/low do not',
 
 test('no changes is reported', () => {
   assert.ok(evaluate({ ...base, verdict: approved, changed: [] }).failures.length === 1);
+});
+
+// Casos nuevos parametrizados según especificación
+test('roadmap: null no exige documento', () => {
+  const r = evaluate({ ...base, check: { ...legacyCheck, roadmap: null }, verdict: approved, changed: ['src/a.ts', 'scripts/test-a.cjs'] });
+  assert.ok(!r.failures.some((f) => /publishing-roadmap|roadmap/i.test(f)));
+});
+
+test('roadmap: "docs/plan.md" lo exige', () => {
+  const r = evaluate({ ...base, check: { ...legacyCheck, roadmap: 'docs/plan.md' }, verdict: approved, changed: ['src/a.ts', 'scripts/test-a.cjs'] });
+  assert.ok(r.failures.some((f) => f.includes('No se actualizó docs/plan.md')));
+});
+
+test('decisions: null no exige índice', () => {
+  const r = evaluate({ ...base, check: { ...legacyCheck, decisions: null }, agentsMd: '', verdict: approved, changed: ['scripts/tool.cjs', 'docs/decisions/18-new.md'] });
+  assert.ok(!r.failures.some((f) => /decisión.*índice/i.test(f)));
+});
+
+test('hardcodedColorFiles: null no revisa colores', () => {
+  const changed = ['src/components/ReleaseCatalog.svelte', 'scripts/test-x.cjs'];
+  const r = evaluate({
+    ...base,
+    check: { ...legacyCheck, hardcodedColorFiles: null, roadmap: null },
+    verdict: approved,
+    changed,
+    addedLinesByFile: { 'src/components/ReleaseCatalog.svelte': ['  .x { color:#ef4444; }'] },
+  });
+  assert.ok(!r.failures.some((f) => /Colores fijos/.test(f)));
+});
+
+test('areaSuites configurado aparece en las sugerencias', () => {
+  const customSuites = [
+    { pattern: '^src/custom/', suites: ['npm run test:custom:e2e'] },
+  ];
+  const r = evaluate({
+    ...base,
+    check: { ...legacyCheck, areaSuites: customSuites, roadmap: null },
+    verdict: approved,
+    changed: ['src/custom/feature.ts', 'scripts/test-feature.cjs'],
+  });
+  assert.deepEqual(r.suites, ['npm run test:custom:e2e']);
 });
 
 console.log(`\ncheck:change rules: ${passed} passed, ${failures.length} failed.`);
