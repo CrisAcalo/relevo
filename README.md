@@ -83,7 +83,7 @@ El comportamiento de relevo se adapta a cada proyecto mediante el archivo `relev
 | `gate.roleScopes` | Diccionario de patrones (expresiones regulares) de archivos modificables según cada rol; los roles sin entrada (p. ej. `coder`) no tienen restricción de rutas | `docs`, `qa`, `vision`, `research`, `review` |
 | `check.baseBranch` | Rama base contra la que se comparan los cambios | `main` |
 | `check.sourcePattern` | Patrón de archivos de código que exigen pruebas unitarias | `^src/` |
-| `check.testPattern` | Patrón de archivos de pruebas admitidos para cubrir código | `^(scripts/test-[\w.-]+\.cjs|test/[\w./-]+)$` |
+| `check.testPattern` | Patrón de archivos de pruebas admitidos para cubrir código | `^(scripts/test-[\w.-]+\.cjs\|test/[\w./-]+)$` |
 | `check.roadmap` | Ruta al archivo de hoja de ruta / estado del proyecto | `null` (desactivado) |
 | `check.decisions.dir` | Directorio donde residen los registros de decisiones | `null` (desactivado) |
 | `check.decisions.index` | Archivo que contiene el índice de decisiones | `null` (desactivado) |
