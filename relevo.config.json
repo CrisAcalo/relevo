@@ -1,0 +1,8 @@
+{
+  "check": {
+    "sourcePattern": "^(lib|bin)/",
+    "testPattern": "^test/[\\w./-]+$",
+    "roadmap": null,
+    "decisions": { "dir": "docs/decisions", "index": "README.md" }
+  }
+}

@@ -73,23 +73,23 @@ El comportamiento de relevo se adapta a cada proyecto mediante el archivo `relev
 
 | Clave | Descripción | Valor por defecto |
 |---|---|---|
-| `runsDir` | Carpeta donde se almacenan metadatos y eventos de cada ejecución | `ver lib/config.cjs` |
-| `worktreesDir` | Carpeta donde se crean los worktrees de las tareas | `ver lib/config.cjs` |
-| `quota.min` | Umbral mínimo de cupo para permitir el lanzamiento de un agente | `ver lib/config.cjs` |
-| `quota.warn` | Umbral de advertencia de cupo bajo | `ver lib/config.cjs` |
-| `gate.scriptsDirs` | Directorios de scripts de verificación autorizados en el gate | `ver lib/config.cjs` |
-| `gate.npmScripts` | Scripts npm autorizados para ejecución por agentes en el gate | `ver lib/config.cjs` |
-| `gate.sensitivePaths` | Patrones de rutas sensibles protegidas contra lectura/escritura | `ver lib/config.cjs` |
-| `gate.roleScopes` | Diccionario de patrones de archivos modificables según cada rol | `ver lib/config.cjs` |
-| `check.baseBranch` | Rama base contra la que se comparan los cambios | `ver lib/config.cjs` |
-| `check.sourcePattern` | Patrón de archivos de código que exigen pruebas unitarias | `ver lib/config.cjs` |
-| `check.testPattern` | Patrón de archivos de pruebas admitidos para cubrir código | `ver lib/config.cjs` |
-| `check.roadmap` | Ruta al archivo de hoja de ruta / estado del proyecto | `ver lib/config.cjs` |
-| `check.decisions.dir` | Directorio donde residen los registros de decisiones | `ver lib/config.cjs` |
-| `check.decisions.index` | Archivo que contiene el índice de decisiones | `ver lib/config.cjs` |
-| `check.verdictFile` | Nombre del archivo de veredicto generado por el agente de QA | `ver lib/config.cjs` |
-| `check.hardcodedColorFiles` | Patrón de archivos de UI donde se prohíben colores fijos sin tokens | `ver lib/config.cjs` |
-| `check.areaSuites` | Lista de asociaciones entre patrones de archivos y suites de prueba E2E | `ver lib/config.cjs` |
+| `runsDir` | Carpeta donde se almacenan metadatos y eventos de cada ejecución | `artifacts/agent-runs` |
+| `worktreesDir` | Carpeta donde se crean los worktrees de las tareas | `.worktrees` |
+| `quota.min` | Umbral mínimo de cupo para permitir el lanzamiento de un agente | `0.15` |
+| `quota.warn` | Umbral de advertencia de cupo bajo | `0.3` |
+| `gate.scriptsDirs` | Directorios de scripts de verificación autorizados en el gate | `scripts` |
+| `gate.npmScripts` | Scripts npm autorizados para ejecución por agentes en el gate | `check`, `verify`, `build`, `dev`, `preview`, `test`, `test:*`, `check:*` |
+| `gate.sensitivePaths` | Patrones de rutas sensibles protegidas contra lectura/escritura | `.env`, `artifacts/.cache` |
+| `gate.roleScopes` | Diccionario de patrones (expresiones regulares) de archivos modificables según cada rol; los roles sin entrada (p. ej. `coder`) no tienen restricción de rutas | `docs`, `qa`, `vision`, `research`, `review` |
+| `check.baseBranch` | Rama base contra la que se comparan los cambios | `main` |
+| `check.sourcePattern` | Patrón de archivos de código que exigen pruebas unitarias | `^src/` |
+| `check.testPattern` | Patrón de archivos de pruebas admitidos para cubrir código | `^(scripts/test-[\w.-]+\.cjs|test/[\w./-]+)$` |
+| `check.roadmap` | Ruta al archivo de hoja de ruta / estado del proyecto | `null` (desactivado) |
+| `check.decisions.dir` | Directorio donde residen los registros de decisiones | `null` (desactivado) |
+| `check.decisions.index` | Archivo que contiene el índice de decisiones | `null` (desactivado) |
+| `check.verdictFile` | Nombre del archivo de veredicto generado por el agente de QA | `.qa-verdict.json` |
+| `check.hardcodedColorFiles` | Patrón de archivos de UI donde se prohíben colores fijos sin tokens | `null` (desactivado) |
+| `check.areaSuites` | Lista de asociaciones entre patrones de archivos y suites de prueba E2E | `[]` |
 
 ---
 
@@ -183,6 +183,13 @@ Permite consultar los cupos restantes del proveedor sin consumir tokens de conte
 2. **Sin flags de bypass**: Ningún comando ni lanzador añade flags que desactiven el sandbox o los permisos (`--dangerously-skip-permissions`, `--bypass`, etc.). Si se detectan en los argumentos, la ejecución es abortada.
 3. **Claves de API seguras**: Las credenciales de proveedores se gestionan exclusivamente mediante variables de entorno en la sesión del usuario, nunca en archivos del repositorio.
 4. **Configuración global del CLI**: Las opciones globales de configuración del agente (como `toolPermission: "always-proceed"` en agy) son gestionadas directamente por el usuario; Claude Code no modifica archivos fuera del espacio de trabajo.
+
+---
+
+## Decisiones
+
+- [01 · Origen, alcance y nombre](docs/decisions/01-origen-y-alcance.md)
+- [02 · Flujo Claude + agentes](docs/decisions/02-flujo-claude-agentes.md)
 
 ---
 
