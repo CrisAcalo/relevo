@@ -67,6 +67,8 @@ test('tipo incorrecto → Error que nombra la clave', () => {
     [{ runsDir: 123 }, 'runsDir'],
     [{ legacyRunsDirs: 'not-array' }, 'legacyRunsDirs'],
     [{ worktreesDir: null }, 'worktreesDir'],
+    [{ taskBranchPrefix: 123 }, 'taskBranchPrefix'],
+    [{ taskBranchPrefix: '' }, 'taskBranchPrefix'],
     [{ quota: { min: '0.1', warn: 0.3 } }, 'quota.min'],
     [{ quota: { min: 0.15, warn: false } }, 'quota.warn'],
     [{ gate: { ...DEFAULTS.gate, npmScripts: 'test' } }, 'gate.npmScripts'],
