@@ -7,9 +7,12 @@
  *   relevo watch [--once | --list | <NN>]
  *   relevo quota [--json]
  *   relevo check            (definición de hecho mecánica sobre la rama actual)
+ *   relevo doctor [--json]  (comprueba entorno, configuración global del CLI e instalación)
+ *   relevo task new <nombre> [--from <ref>] | task done <nombre> [--force] | task list
+ *   relevo update [--apply] (actualiza lo instalado sin pisar lo personalizado)
  */
 const path = require('node:path');
-const COMMANDS = { init: 'init.cjs', run: 'run.cjs', watch: 'watch.cjs', quota: 'quota.cjs', check: 'check-change.cjs' };
+const COMMANDS = { init: 'init.cjs', run: 'run.cjs', watch: 'watch.cjs', quota: 'quota.cjs', check: 'check-change.cjs', doctor: 'doctor.cjs', task: 'task.cjs', update: 'update.cjs' };
 const [command, ...rest] = process.argv.slice(2);
 if (!COMMANDS[command]) {
   console.error(`relevo · comando desconocido "${command ?? ''}". Usa: ${Object.keys(COMMANDS).join(', ')}`);

@@ -3,10 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "description": "Claude planifica y audita; agentes de otros proveedores (Antigravity, Codex…) implementan en worktrees con permisos acotados por rol, y nada se integra sin verificación independiente.",
-  "bin": { "relevo": "bin/relevo.cjs" },
-  "engines": { "node": ">=22.12" },
+  "bin": {
+    "relevo": "bin/relevo.cjs"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
-    "test": "node test/root.test.cjs && node test/config.test.cjs && node test/permission-gate.test.cjs && node test/agent-runs.test.cjs && node test/check-change.test.cjs && node test/agent-quota.test.cjs && node test/init.test.cjs",
+    "test": "node test/root.test.cjs && node test/config.test.cjs && node test/permission-gate.test.cjs && node test/agent-runs.test.cjs && node test/check-change.test.cjs && node test/agent-quota.test.cjs && node test/init.test.cjs && node test/verdict.test.cjs && node test/doctor.test.cjs && node test/task.test.cjs && node test/update.test.cjs",
     "agent:run": "node bin/relevo.cjs run",
     "agents": "node bin/relevo.cjs watch",
     "agents:quota": "node bin/relevo.cjs quota",
