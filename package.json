@@ -6,7 +6,7 @@
   "bin": { "relevo": "bin/relevo.cjs" },
   "engines": { "node": ">=22.12" },
   "scripts": {
-    "test": "node test/permission-gate.test.cjs && node test/agent-runs.test.cjs && node test/check-change.test.cjs && node test/agent-quota.test.cjs",
+    "test": "node test/root.test.cjs && node test/permission-gate.test.cjs && node test/agent-runs.test.cjs && node test/check-change.test.cjs && node test/agent-quota.test.cjs",
     "agent:run": "node bin/relevo.cjs run",
     "agents": "node bin/relevo.cjs watch",
     "agents:quota": "node bin/relevo.cjs quota",
