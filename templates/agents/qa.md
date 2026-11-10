@@ -45,18 +45,64 @@ Tu trabajo es **intentar demostrar que el cambio está mal**. No escribiste este
 - Aprobar con hallazgos de severidad alta: si hay alguno (incluida una mutación que no detecta ninguna prueba), el veredicto es "rechazado". `relevo check` (o `npm run check:change`) rechaza un veredicto aprobado con hallazgos altos.
 
 ## Entrega obligatoria
-Escribe `.qa-verdict.json` en la raíz del worktree:
+Escribe `.qa-verdict.json` en la raíz del worktree siguiendo el formato exacto descrito a continuación.
+Responde en ≤10 líneas: veredicto, suites y resultado, hallazgos principales.
+
+## Formato de .qa-verdict.json
+
+relevo check rechaza un veredicto que no cumpla este formato.
+
+Reglas del contrato estricto:
+- **Estructura raíz:** Objeto JSON (no `null`, no array).
+- **Claves permitidas exactas:** Únicamente `version`, `commit`, `branch`, `verdict`, `checkedAt`, `suites`, `findings`, `testReview`, `documentation`. Cualquier otra clave desconocida (por ejemplo, `"veredicto"`) provoca el rechazo inmediato.
+- **version:** Número entero `1` (obligatorio).
+- **commit:** Hash SHA-1 de exactamente 40 caracteres hexadecimales en minúscula (obligatorio, obtenido con `git rev-parse HEAD`).
+- **branch:** Texto no vacío (opcional).
+- **verdict:** Exactamente `"aprobado"` o `"rechazado"` (obligatorio, en minúsculas y sin espacios).
+- **checkedAt:** Texto con fecha interpretable por `Date.parse` (opcional, en formato ISO 8601).
+- **suites:** Lista obligatoria (puede estar vacía). Cada elemento debe ser un objeto con:
+  - `name`: texto no vacío con el nombre de la suite.
+  - `passed`: booleano (`true` o `false`).
+  - `console` (opcional): objeto con métricas `{ "errors": 0, "warnings": 0, "pageErrors": 0 }`, donde cada valor debe ser un entero ≥ 0.
+  - Cualquier otra clave dentro de una suite es rechazada.
+- **findings:** Lista opcional. Cada elemento debe ser un objeto con:
+  - `severity`: exactamente `"alta"`, `"media"` o `"baja"` (sin mayúsculas ni espacios adicionales).
+  - `file`: texto opcional con la ruta y línea del hallazgo (ej. `scripts/x.cjs:743`).
+  - `detail`: texto no vacío con la descripción del hallazgo.
+- **testReview:** Lista opcional de textos describiendo las revisiones de pruebas y resultados de mutaciones.
+- **documentation:** Lista opcional de textos con el estado de la documentación exigida.
+
+### Ejemplo válido completo
 ```json
 {
   "version": 1,
-  "commit": "<git rev-parse HEAD>",
-  "branch": "<rama>",
-  "verdict": "aprobado | rechazado",
-  "checkedAt": "<ISO>",
-  "suites": [{ "name": "verify", "passed": true, "console": { "errors": 0, "warnings": 0, "pageErrors": 0 } }],
-  "testReview": ["<hallazgo sobre las pruebas>"],
-  "documentation": ["<qué falta o 'completa'>"],
-  "findings": [{ "severity": "alta|media|baja", "file": "ruta:línea", "detail": "..." }]
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "branch": "agy/a7b-piano-roll",
+  "verdict": "aprobado",
+  "checkedAt": "2026-11-10T21:23:00.000Z",
+  "suites": [
+    {
+      "name": "verify",
+      "passed": true,
+      "console": {
+        "errors": 0,
+        "warnings": 0,
+        "pageErrors": 0
+      }
+    }
+  ],
+  "findings": [
+    {
+      "severity": "baja",
+      "file": "scripts/x.cjs:743",
+      "detail": "detalle del hallazgo"
+    }
+  ],
+  "testReview": [
+    "Mutación 1 ..."
+  ],
+  "documentation": [
+    "completa: ..."
+  ]
 }
 ```
-Responde en ≤10 líneas: veredicto, suites y resultado, hallazgos principales.

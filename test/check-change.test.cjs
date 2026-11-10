@@ -9,7 +9,7 @@ function test(name, action) {
   catch (error) { failures.push({ name, error }); console.error(`FAIL ${name}: ${error.message}`); }
 }
 const head = 'a'.repeat(40);
-const approved = { commit: head, verdict: 'aprobado', suites: [{ name: 'verify', passed: true }] };
+const approved = { version: 1, commit: head, verdict: 'aprobado', suites: [{ name: 'verify', passed: true }] };
 
 const legacyCheck = {
   baseBranch: 'main',
@@ -103,9 +103,9 @@ test('new hardcoded colors in UI files fail unless justified; tokens and non-UI 
 
 test('an approved verdict with high-severity findings fails; medium/low do not', () => {
   const changed = ['src/a.ts', 'scripts/test-a.cjs', 'docs/publishing-roadmap.md'];
-  const high = evaluate({ ...base, changed, verdict: { ...approved, findings: [{ severity: 'alta', file: 'src/audio/ExportPipeline.ts:52' }] } });
+  const high = evaluate({ ...base, changed, verdict: { ...approved, findings: [{ severity: 'alta', file: 'src/audio/ExportPipeline.ts:52', detail: 'falla grave' }] } });
   assert.ok(high.failures.some((f) => /severidad alta/.test(f) && /ExportPipeline/.test(f)));
-  const medium = evaluate({ ...base, changed, verdict: { ...approved, findings: [{ severity: 'media', file: 'x' }, { severity: 'baja', file: 'y' }] } });
+  const medium = evaluate({ ...base, changed, verdict: { ...approved, findings: [{ severity: 'media', file: 'x', detail: 'aviso' }, { severity: 'baja', file: 'y', detail: 'nota' }] } });
   assert.ok(!medium.failures.some((f) => /severidad alta/.test(f)));
 });
 
@@ -152,6 +152,14 @@ test('areaSuites configurado aparece en las sugerencias', () => {
     changed: ['src/custom/feature.ts', 'scripts/test-feature.cjs'],
   });
   assert.deepEqual(r.suites, ['npm run test:custom:e2e']);
+});
+
+test('un veredicto inválido produce el fallo "El veredicto no es válido" y no el de "es de otro commit"', () => {
+  const changed = ['src/a.ts', 'scripts/test-a.cjs', 'docs/publishing-roadmap.md'];
+  const invalidVerdict = { commit: 'b'.repeat(40), veredicto: 'aprobado' };
+  const r = evaluate({ ...base, changed, verdict: invalidVerdict });
+  assert.ok(r.failures.some((f) => f.includes('El veredicto no es válido')));
+  assert.ok(!r.failures.some((f) => /no del actual/.test(f)));
 });
 
 console.log(`\ncheck:change rules: ${passed} passed, ${failures.length} failed.`);
