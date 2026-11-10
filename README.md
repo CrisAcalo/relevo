@@ -11,6 +11,7 @@ Nada llega a la rama principal sin verificación independiente.
 ![Dependencias: 0](https://img.shields.io/badge/dependencias-0-brightgreen)
 ![Windows · Linux · macOS](https://img.shields.io/badge/plataformas-Windows%20%C2%B7%20Linux%20%C2%B7%20macOS-informational)
 ![Estado: 0.1.0](https://img.shields.io/badge/estado-0.1.0%20en%20desarrollo-orange)
+[![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-blue)](LICENSE)
 
 [Inicio rápido](#inicio-rápido) · [Cómo funciona](#cómo-funciona) · [Seguridad](#seguridad) · [Documentación](#documentación)
 
@@ -164,3 +165,7 @@ node bin/relevo.cjs check
 ```
 
 El código es CommonJS sin dependencias de terceros: solo módulos `node:`. Los cambios siguen el propio flujo de relevo. Convenciones en [CLAUDE.md](CLAUDE.md).
+
+## Licencia
+
+[MIT](LICENSE) © 2026 Cristian Acalo
