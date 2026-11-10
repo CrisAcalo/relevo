@@ -1,6 +1,6 @@
 /* Definition-of-done rules used by scripts/check-change.cjs. No git or browser is used. */
 const assert = require('node:assert/strict');
-const { evaluate } = require('./check-change.cjs');
+const { evaluate } = require('../lib/check-change.cjs');
 
 const failures = [];
 let passed = 0;

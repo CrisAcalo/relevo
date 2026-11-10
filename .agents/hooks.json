@@ -1,0 +1,16 @@
+{
+  "repo-permission-gate": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|browser_.*|edit_file|write_to_file|write_file|replace_file_content|multi_replace_file_content|sed_file|notebook_edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node hooks/permission-gate.cjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

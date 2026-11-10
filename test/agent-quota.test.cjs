@@ -1,6 +1,6 @@
 /* Agent quota parsing and model-to-group mapping. Uses a recorded `/usage` payload; no agent CLI is called. */
 const assert = require('node:assert/strict');
-const { parseAgyUsage, quotaGroupForModel, remainingFor } = require('./agents/quota.cjs');
+const { parseAgyUsage, quotaGroupForModel, remainingFor } = require('../lib/quota.cjs');
 
 const failures = [];
 let passed = 0;

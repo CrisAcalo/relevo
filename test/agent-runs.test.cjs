@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { Run } = require('./agents/runs.cjs');
-const { PROVIDERS, detectProvider, classifyTool } = require('./agents/providers.cjs');
+const { Run } = require('../lib/runs.cjs');
+const { PROVIDERS, detectProvider, classifyTool } = require('../lib/providers.cjs');
 
 const failures = [];
 let passed = 0;
@@ -117,7 +117,7 @@ test('launcher command builders never add permission bypass flags', () => {
 });
 
 test('only launcher folders (NN-name with meta.json) are discovered as runs', () => {
-  const source = fs.readFileSync(path.join(__dirname, 'agents/runs.cjs'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../lib/runs.cjs'), 'utf8');
   assert.match(source, /\^\\d\+-/);
   assert.match(source, /meta\.json/);
 });
