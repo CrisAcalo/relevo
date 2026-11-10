@@ -1,0 +1,48 @@
+{
+  "toolPermission": "always-proceed",
+  "permissions": {
+    "allow": [
+      "command(git status)",
+      "command(git diff)",
+      "command(git log)",
+      "command(git show)",
+      "command(git ls-files)",
+      "command(Get-Content)",
+      "command(Select-String)",
+      "command(Get-ChildItem)",
+      "command(Get-Location)",
+      "command(Test-Path)",
+      "command(rg )",
+      "command(node scripts/)",
+      "command(npm run check)",
+      "command(npm run verify)",
+      "command(npm run build)",
+      "command(npm run test)",
+      "command(npm.cmd run test)",
+      "command(npm.cmd run check)",
+      "command(npm.cmd run verify)",
+      "command(npm.cmd run build)"
+    ],
+    "deny": [
+      "command(git push)",
+      "command(git commit)",
+      "command(git reset)",
+      "command(git rebase)",
+      "command(git merge)",
+      "command(git add)",
+      "command(npm install)",
+      "command(npm i )",
+      "command(npm ci)",
+      "command(npm publish)",
+      "command(pnpm)",
+      "command(yarn)",
+      "command(npx)",
+      "command(curl)",
+      "command(wget)",
+      "command(Invoke-WebRequest)",
+      "command(Invoke-RestMethod)",
+      "command(Remove-Item)",
+      "command(rm )"
+    ]
+  }
+}
