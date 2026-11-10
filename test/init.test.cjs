@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -173,6 +174,42 @@ test('comprobación dentro de artifacts/: node bin/relevo.cjs init funciona', ()
     assert.ok(fs.existsSync(path.join(cliTempDir, '.agents/hooks/permission-gate.cjs')));
   } finally {
     fs.rmSync(cliTempDir, { recursive: true, force: true });
+  }
+});
+
+test('init crea .agents/relevo.lock.json con los hashes correctos', () => {
+  const repo = makeGitRepo(tmpBase);
+  init({ cwd: repo, silent: true });
+
+  const lockPath = path.join(repo, '.agents/relevo.lock.json');
+  assert.ok(fs.existsSync(lockPath), 'El archivo .agents/relevo.lock.json debe existir');
+
+  const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  const pkg = require('../package.json');
+
+  assert.equal(lock.version, 1);
+  assert.equal(lock.relevo, pkg.version);
+  assert.ok(lock.files && typeof lock.files === 'object');
+
+  // No debe incluir archivos excluidos
+  assert.equal(lock.files['relevo.config.json'], undefined);
+  assert.equal(lock.files['.agents/skills.json'], undefined);
+  assert.equal(lock.files['.gitignore'], undefined);
+  assert.equal(lock.files['.agents/relevo.lock.json'], undefined);
+
+  // Debe tener al menos la puerta, hooks, skills y agentes
+  const fileKeys = Object.keys(lock.files);
+  assert.ok(fileKeys.length > 0);
+  assert.ok(fileKeys.includes('.agents/hooks/permission-gate.cjs'));
+  assert.ok(fileKeys.includes('.agents/hooks.json'));
+
+  // Recalcular hashes reales y comprobar coincidencia
+  for (const [relPath, expectedHash] of Object.entries(lock.files)) {
+    const fullPath = path.join(repo, relPath);
+    assert.ok(fs.existsSync(fullPath), `El archivo gestionado ${relPath} debe existir en el repositorio`);
+    const content = fs.readFileSync(fullPath);
+    const actualHash = crypto.createHash('sha256').update(content).digest('hex');
+    assert.equal(actualHash, expectedHash, `El hash de ${relPath} debe coincidir con el del lock`);
   }
 });
 
