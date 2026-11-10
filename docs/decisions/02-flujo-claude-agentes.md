@@ -10,7 +10,7 @@
 
 ## Por qué
 
-El origen de cada regla de este flujo, de la puerta de permisos, de `relevo check` y del lanzador está en [por-que-cada-regla.md](../por-que-cada-regla.md); los fallos reales que las motivaron, con síntoma, causa y regla resultante, en [incidentes.md](../incidentes.md).
+El origen de cada regla de este flujo, de la puerta de permisos, de `relevo check` y del lanzador está en [por-que-cada-regla.md](../por-que-cada-regla.md); los comandos (incluidos `doctor`, `task` y `update`) en [comandos.md](../comandos.md); los fallos reales que las motivaron, con síntoma, causa y regla resultante, en [incidentes.md](../incidentes.md).
 
 ## Ejecución
 

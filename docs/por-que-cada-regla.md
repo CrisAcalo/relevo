@@ -50,6 +50,20 @@ No ejecuta suites: comprueba que el ciclo se cumplió.
 | Guarda encargo, metadatos, eventos y errores en `runsDir/<NN>-<tarea>/` | Poder auditar y repetir cualquier ejecución | Preventiva; el panel solo cuenta esas carpetas (I-18) |
 | Pasa `AGY_ROLE` y `AGY_RUN_DIR` al agente | Que la puerta aplique el ámbito del rol | Incidente I-08 |
 
+## Comandos de mantenimiento (`doctor`, `task`, `update`) y veredicto
+
+| Regla | Qué protege | Origen |
+|---|---|---|
+| `doctor` solo lee, y de la configuración global de agy solo `toolPermission` y `permissions.deny`; nunca imprime otras claves | Que un diagnóstico filtre rutas personales (`trustedWorkspaces`) o modifique algo | Preventiva |
+| `doctor` exige en `deny` al menos `git push`, `git commit`, `npm publish`, `npm install`, `npx` y `curl` | Que falte la primera capa de permisos sin que nadie lo note | Incidentes I-01 e I-02; la capa 1 no estaba documentada al extraer relevo |
+| `doctor` decide el `.gitignore` con `git check-ignore`, no comparando líneas | Avisos falsos cuando una regla más amplia ya cubre la ruta | Hallazgo de auditoría al construir relevo |
+| `task done` borra primero el enlace de `node_modules` con `unlink` o `rmdir` sin recursión, y se detiene si es un directorio real | Que cerrar una tarea borre el `node_modules` del repositorio principal a través de la junction | Preventiva; probada con 1.001 archivos reales |
+| `task done` exige rama integrada y worktree sin cambios (salvo `--force`) | Perder trabajo no integrado | Preventiva |
+| git siempre con argumentos en lista y comprobando el código de salida | Rebases o borrados a medias que pasan desapercibidos | Incidente I-07 |
+| `update` usa el registro de instalación como base de una fusión a tres bandas y nunca sobrescribe lo personalizado | Perder los marcadores `<<PROYECTO: …>>` que el usuario rellenó; ofrecer la misma plantilla para siempre | Incidente R-03; `init --force` sobrescribe |
+| `update` trata como error una puerta modificada | Que alguien relaje la política editando la puerta en lugar de la configuración | Preventiva; la puerta debe ser idéntica a la de relevo |
+| Esquema estricto de `.qa-verdict.json` | Que un campo mal escrito (`"veredicto"`) o una severidad `"High"` se cuele como aprobado | Preventiva; refuerza I-12 |
+
 ## Flujo
 
 | Regla | Qué protege | Origen |

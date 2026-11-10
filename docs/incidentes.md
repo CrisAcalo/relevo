@@ -128,3 +128,8 @@ Formato: síntoma observado → causa comprobada → regla resultante (dónde vi
 ### R-02 · Ruta absoluta del proyecto de origen dentro de la puerta
 - **Síntoma:** la puerta trataba como "interna" cualquier ruta bajo `C:/Proyectos/Personal/GeneradorMusica`, también instalada en otro repositorio.
 - **Regla:** las rutas absolutas se permiten solo dentro del repositorio donde está instalada la puerta, de su repositorio principal si es un worktree, o de `workspacePaths`. Comprobado con 2.096 llamadas reales: ninguna denegación se relajó. (`lib/permission-gate.cjs`; `test/permission-gate.test.cjs`)
+
+### R-03 · `update` habría ofrecido la misma plantilla para siempre (auditoría, 2026-11-10)
+- **Síntoma:** en la primera versión de `relevo update`, una skill con sus marcadores rellenados se informaba como "personalizado" y `--apply` escribía `.relevo-new` en cada ejecución, aunque la plantilla no hubiera cambiado; y tras integrar a mano una plantilla nueva, se volvía a ofrecer.
+- **Causa:** la decisión comparaba solo plantilla e instalado, sin usar el registro de instalación como base común.
+- **Regla:** fusión a tres bandas con la base en `.agents/relevo.lock.json`; al ofrecer una plantilla nueva, la base pasa a esa plantilla. Detectado por el auditor leyendo el código, antes de usarlo en un proyecto real. (`lib/update.cjs`; casos h–k de `test/update.test.cjs`)
