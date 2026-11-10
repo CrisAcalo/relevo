@@ -15,6 +15,50 @@
 | `check [--docs-only] [--base <ref>]` | Definición de hecho mecánica sobre la rama actual. | No |
 | `update [--apply] [--force]` | Actualiza lo instalado sin pisar lo personalizado (ver abajo). Sin `--apply` solo muestra el plan. | Solo con `--apply` |
 
+Los alias npm sugeridos son `agent:run`, `agents` (watch), `agents:quota` y `check:change`.
+
+## `run`
+
+```bash
+relevo run --provider agy --role coder --model gemini-3.8-flash-high \
+  --task mi-tarea --cwd .worktrees/mi-tarea --brief encargos/mi-tarea.md
+```
+
+| Opción | Descripción |
+|---|---|
+| `--provider` | `agy` o `codex`. |
+| `--role` | `coder`, `qa`, `docs`, `vision`, `research` o `review`; la puerta limita qué archivos puede editar. |
+| `--model` | Modelo del proveedor. |
+| `--task` | Nombre de la tarea (letras, números y guiones). |
+| `--cwd` | Worktree donde trabaja el agente; debe existir dentro del repositorio. |
+| `--brief` | Archivo con el encargo. |
+| `--timeout` | Segundos máximos (por defecto 3000). |
+| `--mode`, `--conversation`, `--agent` | Opciones de agy: plan, continuar una conversación, agente concreto. |
+| `--sandbox` | Modo de sandbox de Codex (por defecto `workspace-write`). |
+| `--allow-low-quota` | Lanza aunque el cupo esté por debajo de `quota.min`; exige justificarlo. |
+
+Se ejecuta siempre desde la raíz del repositorio principal, nunca desde un worktree. Cada ejecución guarda en `<runsDir>/<NN>-<tarea>/` el encargo (`brief.md`), los metadatos (`meta.json`, con el cupo antes y después), los eventos del CLI (`events.ndjson`) y `stderr.log`.
+
+## `watch`
+
+Tarjetas por agente con proveedor, rol, modelo, duración, tokens y desglose de acciones (lecturas, búsquedas, ediciones, comandos, esperas). Teclado: `↑`/`↓` selecciona, `Enter` abre el registro paso a paso, `Esc` vuelve, `q` sale. Sin interacción: `watch --list` (tabla de ejecuciones) o `watch <NN> --once` (detalle de una).
+
+## `quota`
+
+Consulta `agy -p /usage`, que no consume tokens, y distingue grupos de cupo (Gemini, Argon, terceros). `run` rechaza lanzar por debajo de `quota.min` y avisa por debajo de `quota.warn`. `--json` devuelve el resultado normalizado.
+
+## `check`
+
+Compara la rama actual con su base (`git merge-base`). No ejecuta suites: comprueba que el ciclo se cumplió. Falla si:
+
+- Cambia código fuente (`check.sourcePattern`) sin tocar pruebas (`check.testPattern`), salvo `--no-tests-reason "<motivo>"`.
+- Falta el veredicto de QA, no cumple el esquema (ver abajo), es de otro commit, no está `aprobado`, tiene suites fallidas o hallazgos de severidad alta.
+- Hay cambios sin commit cuando el veredicto debe corresponder a un commit.
+- No se actualizó `check.roadmap` o una decisión nueva no aparece en `check.decisions.index`.
+- Hay colores fijos nuevos en `check.hardcodedColorFiles`, salvo `--allow-colors "<motivo>"`.
+
+También sugiere las suites E2E del área tocada (`check.areaSuites`). Opciones: `--base <ref>`, `--docs-only`.
+
 ## `doctor`
 
 Comprobaciones, en orden: versión de Node (≥ 22.12), git y repositorio, `agy --version` (aviso si falta: relevo funciona con otro proveedor), configuración global de agy (`RELEVO_AGY_SETTINGS` o `~/.gemini/antigravity-cli/settings.json`: aviso si falta o si `toolPermission` no es `always-proceed`; solo lee `toolPermission` y `permissions.deny` y nunca imprime otras claves, porque `trustedWorkspaces` contiene rutas personales), reglas `deny` mínimas (`git push`, `git commit`, `npm publish`, `npm install`, `npx`, `curl`), `relevo.config.json` válido, puerta instalada e idéntica a la de relevo, `hooks.json`, `.gitignore` (preguntando a git con `git check-ignore`, así una regla más amplia como `artifacts/` cuenta) y marcadores `<<PROYECTO: …>>` sin rellenar.
