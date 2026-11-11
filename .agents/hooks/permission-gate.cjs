@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /*
- * Antigravity (agy) PreToolUse gate for this repository.
- * Reads the hook payload on stdin and prints {decision, reason}.
- *   allow -> read-only inspection and the project's own verification commands
- *   deny  -> publishing, pushing, dependency changes, network, destructive deletes, visible browsers
- *   ask   -> everything else (the human decides)
- * Claude Code audits and commits; agy never commits or pushes.
+ * Puerta de permisos PreToolUse de Antigravity (agy) para este repositorio.
+ * Lee la petición del hook por stdin e imprime {decision, reason}.
+ *   allow -> inspección de solo lectura y verificación propia del proyecto
+ *   deny  -> publicar, git de escritura, dependencias, red, borrados recursivos, navegadores visibles
+ *   ask   -> todo lo demás; con toolPermission "always-proceed" se EJECUTA, por eso lo peligroso es deny
+ * Las reglas deny se comprueban sobre el comando original y su forma canónica (canonicalCommand).
+ * Claude Code audita y hace commit; agy nunca hace commit ni push.
  */
 'use strict';
 
@@ -213,6 +214,17 @@ function decideEdit(payload, role, roleScopes, repoRoot, worktreesDir) {
   return { decision: 'deny', reason: `El rol ${role} no puede modificar ${relative ?? target ?? 'esa ruta'}; repórtalo en tu entrega en lugar de editarlo.` };
 }
 
+const GIT_GLOBAL_OPTIONS = /\bgit((?:\s+(?:-C|-c|--git-dir|--work-tree|--namespace|--exec-path|--config-env)(?:=|\s+)(?:"[^"]*"|'[^']*'|[^\s"']+)|\s+(?:--no-pager|--paginate|-p|-P|--bare|--no-replace-objects|--literal-pathspecs|--no-optional-locks))*)(?=\s)/gi;
+
+// Forma canónica de un comando, solo para las reglas deny (nunca para permitir):
+// quita extensiones de ejecutable, las opciones globales de git, las comillas y los espacios repetidos.
+// Dos pasadas: la primera respeta los argumentos entre comillas (git -C "C:/a b" push) y la segunda,
+// ya sin comillas, alcanza los programas entrecomillados (& "git.exe" push).
+function canonicalCommand(command) {
+  const pass = (text) => text.replace(/\b([\w-]+)\.(exe|cmd|bat|ps1)\b/gi, '$1').replace(GIT_GLOBAL_OPTIONS, 'git');
+  return pass(pass(String(command ?? '')).replace(/["']/g, '')).replace(/\s+/g, ' ');
+}
+
 function decide(payload, env = process.env, repoRootOverride = null) {
   const repoRoot = repoRootOverride || path.resolve(__dirname, '../..');
   let loaded;
@@ -238,18 +250,21 @@ function decide(payload, env = process.env, repoRootOverride = null) {
   if (!command) return { decision: 'ask', reason: 'Comando vacío.' };
 
   const denyRules = [
-    [/\bgit\s+(push|commit|merge|rebase|reset|checkout|switch|restore|tag|remote|add|rm|mv|stash|cherry-pick|revert|am|apply|clean|worktree|branch\s+-[dDmMfc])\b/i,
+    [/\bgit\s+(push|commit|merge|rebase|reset|checkout|switch|restore|tag|remote|add|rm|mv|stash|cherry-pick|revert|am|apply|clean|worktree|update-ref|symbolic-ref|update-index|read-tree|commit-tree|config|fetch|pull|clone|submodule|init|gc|prune|reflog|filter-branch|filter-repo|notes|replace|branch\s+-[dDmMfc])\b/i,
       'Git que modifica el índice, el historial o las ramas: solo lo hace Claude tras auditar.'],
-    [/\bnpm\s+(i|install|ci|uninstall|update|publish|link|exec)\b|\bnpx\b|\bpnpm\b|\byarn\b/i, 'Cambios de dependencias o ejecución de paquetes no auditados.'],
+    [/\bnpm(?:\s+--?[\w-]+(?:[= ](?!-)[^\s|;&]+)?)*\s+(i|install|ci|uninstall|update|publish|link|exec)\b|\bnpx\b|\bpnpm\b|\byarn\b/i, 'Cambios de dependencias o ejecución de paquetes no auditados.'],
     [/\b(curl|wget|invoke-webrequest|iwr|invoke-restmethod|irm|ssh|scp)\b/i, 'Acceso de red no permitido en tareas de código.'],
-    [/\b(rm\s+-\w*r\w*|remove-item\b[^|;]*-recurse|rmdir\s+\/s|del\s+\/s|format-volume)\b/i, 'Borrado recursivo bloqueado.'],
+    [/(?:^|[\s"'(&|;])rm\s(?:[^|;&]*\s)?(?:-[a-z]*r[a-z]*|--recursive)\b/i, 'Borrado recursivo bloqueado.'],
+    [/(?:^|[\s"'(&|;])(?:remove-item|ri|del|erase|rd|rmdir)\s(?:[^|;&]*\s)?(?:-r\w*|\/s)\b/i, 'Borrado recursivo bloqueado.'],
+    [/\bformat-volume\b/i, 'Borrado recursivo bloqueado.'],
     [/\b(invoke-expression|iex|add-type|set-executionpolicy|reg\s+add|setx)\b/i, 'Ejecución dinámica o cambio de sistema bloqueado.'],
-    [/\b(chrome|msedge|firefox)(\.exe)?\b(?![^|;]*--headless)/i, 'Navegador visible prohibido: usar scripts/lib/browser.cjs (headless).'],
+    [/\b(chrome|msedge|firefox)(\.exe)?\b(?![^|;]*--headless)/i, 'Navegador visible prohibido: usa las pruebas headless del proyecto.'],
     [sensitiveRegex, 'Ruta sensible (.env o perfiles de navegador).'],
   ];
 
+  const canonical = canonicalCommand(command);
   for (const [pattern, reason] of denyRules) {
-    if (pattern.test(command)) return { decision: 'deny', reason };
+    if (pattern.test(command) || pattern.test(canonical)) return { decision: 'deny', reason };
   }
 
   if (/[>`]|\$\(|\.\.[\\/]\.\./.test(command)) {
@@ -306,4 +321,4 @@ if (require.main === module) {
 
 const ROLE_SCOPES = buildRoleScopes(DEFAULTS_GATE.roleScopes);
 
-module.exports = { decide, ROLE_SCOPES, DEFAULTS_GATE };
+module.exports = { decide, ROLE_SCOPES, DEFAULTS_GATE, canonicalCommand };

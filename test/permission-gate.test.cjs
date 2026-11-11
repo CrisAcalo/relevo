@@ -6,7 +6,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const gatePath = path.resolve(__dirname, '../lib/permission-gate.cjs');
-const { decide, DEFAULTS_GATE } = require(gatePath);
+const { decide, DEFAULTS_GATE, canonicalCommand } = require(gatePath);
 const { DEFAULTS } = require('../lib/config.cjs');
 const B = String.fromCharCode(92);
 // Entorno explícito: la prueba no debe depender del AGY_ROLE del proceso que la ejecuta (p. ej. un agente con rol qa).
@@ -221,6 +221,76 @@ test('configuración inválida → deny', () => {
 
 test('los valores por defecto de la puerta coinciden con DEFAULTS.gate de lib/config.cjs', () => {
   assert.deepEqual(DEFAULTS_GATE, DEFAULTS.gate);
+});
+
+test('variantes de comandos prohibidos se deniegan (forma canónica)', () => {
+  for (const command of [
+    'npm.cmd install lodash', 'npm.cmd i lodash', 'npm.cmd ci', 'npx.cmd vite',
+    'git.exe push', 'git.exe commit -m x', 'git -C . commit -m x', 'git -C .worktrees/x push origin main',
+    'git -c user.name=x commit -m x', 'git --git-dir=.git --work-tree=. reset --hard', 'git --no-pager -C . checkout main',
+    'git -C "C:/a b" push', 'git update-ref -d HEAD', 'git symbolic-ref HEAD refs/heads/x',
+    'git config core.hooksPath x', 'git config --global user.name x', 'git fetch origin', 'git pull',
+    'git clone https://example.com/x.git', 'git submodule update', 'git init', 'git gc --prune=now',
+    'git reflog expire --all', 'git filter-branch', 'git notes add', 'git replace a b', 'git read-tree HEAD',
+    'git update-index --assume-unchanged a', 'ri -r x', 'ri x -Recurse', 'Remove-Item -Path x -Recurse',
+    'del /q /s x', 'erase /s x', 'rd /s /q x', 'rmdir /q /s x', 'cmd /c rd /s /q x',
+    'rm -fr dist', 'rm -r -f x', 'rm --recursive x',
+    '& "git.exe" push', '& "git" push', '"C:/Program Files/Git/cmd/git.exe" push',
+    "& 'git' commit -m x", 'npm --prefix . install x', 'npm.cmd --silent install x',
+    'npm --registry=https://r.example install x', 'npm.cmd -g install x',
+    // Exige la segunda pasada de canonicalCommand: programa entre comillas seguido de opciones globales de git.
+    '"C:/Program Files/Git/cmd/git.exe" -C . push',
+  ]) {
+    assert.equal(run(command), 'deny', command);
+    assert.equal(decide({
+      toolCall: { name: 'run_command', args: { CommandLine: command } },
+      workspacePaths: ['C:/Proyectos/Personal/GeneradorMusica'],
+    }, { AGY_ROLE: 'coder' }).decision, 'deny', command);
+  }
+});
+
+test('la forma canónica no deniega lectura ni verificación', () => {
+  for (const command of [
+    'git status --short', 'git diff --stat', 'git log --oneline -5', 'git show HEAD', 'git branch',
+    'Get-ChildItem -Recurse src', 'Get-Content README.md -Raw', 'Get-Content docs/rd.md',
+    'npm.cmd run check', 'npm run test:unit',
+  ]) {
+    assert.equal(run(command), 'allow', command);
+  }
+  for (const command of [
+    'git -C . status', 'Copy-Item src/a.ts src/a.ts.qa-bak', 'Move-Item src/a.ts.qa-bak src/a.ts -Force',
+    'Remove-Item src/a.ts.qa-bak', 'echo digit -C x', 'Select-String -Path src -Pattern config',
+    'npm --version',
+  ]) {
+    assert.notEqual(run(command), 'deny', command);
+  }
+});
+
+test('canonicalCommand normaliza ejecutables y opciones globales de git', () => {
+  assert.equal(canonicalCommand('git -C . commit -m x'), 'git commit -m x');
+  assert.equal(canonicalCommand('git --no-pager -C "C:/a b" push'), 'git push');
+  assert.equal(canonicalCommand('git.exe -c user.name=x push'), 'git push');
+  assert.equal(canonicalCommand('npm.cmd   install   lodash'), 'npm install lodash');
+  assert.equal(canonicalCommand('git status'), 'git status');
+  assert.equal(canonicalCommand('git commit -c x'), 'git commit -c x');
+  assert.equal(canonicalCommand('& "git.exe" push'), '& git push');
+});
+
+test('la copia instalada en .agents/hooks es idéntica a lib/permission-gate.cjs', () => {
+  const libGate = fs.readFileSync(path.resolve(__dirname, '../lib/permission-gate.cjs'), 'utf8');
+  const hookGate = fs.readFileSync(path.resolve(__dirname, '../.agents/hooks/permission-gate.cjs'), 'utf8');
+  assert.equal(hookGate, libGate);
+});
+
+test('la forma canónica nunca sirve para permitir', () => {
+  for (const command of [
+    'git -C . status',
+    'git.exe status',
+    'git --no-pager log',
+    '"git" status',
+  ]) {
+    assert.equal(run(command), 'ask', command);
+  }
 });
 
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);

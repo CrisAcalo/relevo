@@ -8,20 +8,21 @@ Decisiones posibles: `allow` (se ejecuta), `deny` (se bloquea con el motivo) y `
 
 | Regla | Qué protege | Origen |
 |---|---|---|
-| Git que modifica índice, historial o ramas (`push`, `commit`, `merge`, `rebase`, `reset`, `checkout`, `switch`, `restore`, `tag`, `remote`, `add`, `rm`, `mv`, `stash`, `cherry-pick`, `revert`, `am`, `apply`, `clean`, `worktree`, borrar o mover ramas) → `deny` a todos los roles | Que solo Claude, tras auditar, cambie el historial; que un agente no deje un rebase a medias ni publique nada | Incidentes I-07 e I-08 (A5b) |
-| `npm install/ci/uninstall/update/publish/link/exec`, `npx`, `pnpm`, `yarn` → `deny` | Dependencias no auditadas, código de paquetes descargado y ejecutado, publicación accidental, mezcla de gestores de paquetes | Preventiva; en el origen, además, el autor eligió un único gestor (npm) |
+| Git que modifica índice, historial, ramas, configuración o remotos (`push`, `commit`, `merge`, `rebase`, `reset`, `checkout`, `switch`, `restore`, `tag`, `remote`, `add`, `rm`, `mv`, `stash`, `cherry-pick`, `revert`, `am`, `apply`, `clean`, `worktree`, `update-ref`, `symbolic-ref`, `update-index`, `read-tree`, `commit-tree`, `config`, `fetch`, `pull`, `clone`, `submodule`, `init`, `gc`, `prune`, `reflog`, `filter-branch`, `filter-repo`, `notes`, `replace`, borrar o mover ramas) → `deny` a todos los roles | Que solo Claude, tras auditar, cambie el historial; que un agente no deje un rebase a medias, no publique nada ni cambie los hooks o la configuración de git | Incidentes I-07 e I-08 (A5b); subcomandos añadidos, R-04 |
+| `npm install/ci/uninstall/update/publish/link/exec` (también `npm.cmd` y con opciones antes del subcomando, como `npm --prefix . install`), `npx`, `pnpm`, `yarn` → `deny` | Dependencias no auditadas, código de paquetes descargado y ejecutado, publicación accidental, mezcla de gestores de paquetes | Preventiva; en el origen, además, el autor eligió un único gestor (npm); variantes, R-04 |
 | Red (`curl`, `wget`, `Invoke-WebRequest`, `irm`, `ssh`, `scp`) → `deny` | Exfiltración de código o secretos y descargas no auditadas durante una tarea de código | Preventiva (comprobada en I-01: `curl` denegado) |
-| Borrados recursivos (`rm -r…`, `Remove-Item -Recurse`, `rmdir /s`, `del /s`, `Format-Volume`) → `deny` | Pérdida de trabajo o del worktree; los artefactos los limpia Claude | Preventiva |
+| Borrados recursivos (`rm -r…`/`-fr`/`--recursive`; `Remove-Item`, `ri`, `del`, `erase`, `rd` o `rmdir` con `-r…` o `/s` en cualquier posición; `Format-Volume`) → `deny` | Pérdida de trabajo o del worktree; los artefactos los limpia Claude | Preventiva; alias y orden de opciones, R-04 |
 | Ejecución dinámica o cambios de sistema (`Invoke-Expression`, `iex`, `Add-Type`, `Set-ExecutionPolicy`, `reg add`, `setx`) → `deny` | Que un agente esquive la política construyendo el comando en tiempo de ejecución o cambie el sistema | Preventiva |
 | Navegadores visibles (`chrome`, `msedge`, `firefox` sin `--headless`) y herramientas `browser_*` → `deny` | Ventanas que interrumpen al usuario y perfiles reales con sus sesiones; las pruebas de interfaz van headless | Preventiva; regla de origen del proyecto (todo E2E headless con perfil propio) |
 | Rutas sensibles (`gate.sensitivePaths`, por defecto `.env` y `artifacts/.cache`) → `deny` | Claves reales y perfiles de navegador con cookies | Preventiva |
+| Forma canónica (`canonicalCommand`): cada regla `deny` se comprueba sobre el comando original y sobre una forma sin extensiones de ejecutable (`.exe`, `.cmd`, `.bat`, `.ps1`), sin opciones globales de git (`-C`, `-c`, `--git-dir`, `--no-pager`…), sin comillas y sin espacios repetidos. Nunca se usa para permitir | Que una variante del mismo comando (`npm.cmd install`, `git -C . commit`, `& "git.exe" push`) esquive una regla `deny` y, con `always-proceed`, se ejecute | Incidente R-04 |
 | Redirecciones (`>`), subexpresiones (`$(…)`, comillas invertidas), `../..` o rutas absolutas fuera del repositorio → `ask` | Escrituras y lecturas que la lista segura no puede razonar | Preventiva; la parte de rutas absolutas, incidente R-02 |
 | Lista segura → `allow`: comandos de solo lectura, `git status/diff/log/show/branch/rev-parse/ls-files/blame/grep`, `node <gate.scriptsDirs>/…`, `npm`/`npm.cmd` con `gate.npmScripts` | Que el agente pueda inspeccionar y verificar sin bloquearse | Incidente I-01 (sin esto, el agente se paraba en cada comando); `npm.cmd`, I-05 |
 | Ámbito de edición por rol (`AGY_ROLE` + `gate.roleScopes`): `docs` solo documentación; `qa` veredicto, artefactos, copias `.qa-bak` y la mutación temporal; `vision`, `research` y `review` solo artefactos; `coder` sin restricción | Que cada agente toque solo lo de su papel; un agente de QA no "arregla" el código que evalúa | Incidente I-08 |
 | Configuración inválida → `deny` todo | Que un error de sintaxis en `relevo.config.json` no abra la puerta | Preventiva (fallo cerrado) |
 | Registro de cada decisión en `.agents/hooks/gate.log` | Que el auditor vea qué intentó el agente, incluido lo denegado | Preventiva; parte de la auditoría |
 
-Límite conocido: la puerta compara texto. Un comando envuelto de otra forma puede esquivarla; no es un sandbox. Se acepta porque trabaja junto con el worktree, la configuración global de agy y la auditoría de Claude.
+Límite conocido: la puerta compara texto. Un comando envuelto de otra forma puede esquivarla; no es un sandbox. La forma canónica cierra las variantes habituales, pero no todas: por ejemplo, `Start-Process git -ArgumentList push` sigue en `ask` (denegar `Start-Process` rompería el arranque de servidores de prueba) y una ruta escapada con acentos graves de PowerShell también. Se acepta porque trabaja junto con el worktree, la configuración global de agy y la auditoría de Claude, que revisa los `ask` en `gate.log`.
 
 ## `relevo check`
 
@@ -83,8 +84,3 @@ No ejecuta suites: comprueba que el ciclo se cumplió.
 | Sin push ni publicación salvo petición explícita | Publicar sin que el autor lo decida | Regla del autor |
 | `AGENTS.md` y `CLAUDE.md` por debajo de 20.000 bytes | Reglas truncadas | Incidente I-06 |
 | Sin `--sandbox` ni `-i` con agy | Worktrees rotos; bloqueo esperando confianza | Incidentes I-03 e I-04 |
-
-## Pendiente detectado al escribir este documento
-
-- El motivo de denegación de navegadores visibles menciona `scripts/lib/browser.cjs`, un archivo del proyecto de origen: debería ser genérico o configurable.
-- El comentario inicial de `lib/permission-gate.cjs` dice que con `ask` "decide el humano"; con `always-proceed` no es así (ver arriba). Corregir el comentario.
