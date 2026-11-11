@@ -56,6 +56,7 @@ Roles: `coder`, `qa`, `docs`, `research`, `vision`, `review`. El lanzador rechaz
 - Bitácora de comandos y decisiones del hook: `.worktrees/<tarea>/.agents/hooks/gate.log` (o en la raíz de la ejecución).
 - Para que el usuario vea el trabajo en vivo, abrir una terminal con `relevo watch` (o `npm run agents`): tarjetas por agente con proveedor, rol, estado, duración, tokens, carpeta/rama, barra y contadores por tipo de acción y últimos pasos o conclusión. Teclado: ↑↓ elegir, Enter detalle, Esc volver, a todos/recientes, q salir. Detalle directo: `relevo watch <NN>`; tabla: `relevo watch --list`; `--once` imprime sin interfaz interactiva.
 - Agentes en paralelo: cada uno con su propio log y carpeta `artifacts/agent-runs/<NN>-<tarea>/` (números distintos) y, si escriben código, su propio worktree. Nunca dos agentes de código en el mismo worktree ni sobre los mismos archivos.
+- **El paralelismo lo dan los agentes, no sesiones de Claude Code**: varias tareas a la vez = varios `relevo run` lanzados desde esta misma sesión, cada uno en su worktree (`relevo task new <tarea>`). No abrir sesiones de Claude Code aparte para tareas del flujo. Si existe alguna, sigue estas mismas reglas y se resuelve sola, sin esperar al usuario. Tareas que tocan los mismos archivos no se lanzan a la vez.
 
 ## Plantilla de encargo
 
@@ -91,6 +92,7 @@ Delicado = persistencia/migraciones, concurrencia, render/exportación/determini
 ## Integración segura (Claude)
 
 - **Claude hace los commits del ciclo** (código, documentación, cierre); nunca hace push salvo petición explícita del usuario.
+- **Integración autónoma**: cuando el ciclo se cumple (auditoría propia con mutaciones, veredicto de QA aprobado sobre el commit exacto que se integra, `relevo check` y pruebas en verde), Claude integra en la rama principal y cierra la tarea con `relevo task done` sin pedir aprobación. Tras un rebase, el veredicto deja de valer: repetir verificación y QA sobre el nuevo HEAD. Preguntar al usuario solo si QA rechaza dos veces la misma tarea, si hace falta una decisión de diseño que el encargo no cubre, si algo no cuadra o antes de una acción hacia fuera (push, publicación).
 - Nunca canalizar `git rebase`, `git merge` ni `git commit` (`| tail`, `| grep`): el código de salida se pierde y el flujo sigue sobre una operación a medias. Comprobar siempre el código de salida y `git status` antes de lanzar el siguiente paso.
 - Con conflictos, los resuelve Claude, nunca un agente. La puerta de permisos deniega a todos los roles comandos de git que modifiquen el índice, historial o ramas.
 - El rol (`--role`) limita qué archivos puede editar el agente: `docs` solo documentación, `qa` veredicto/artefactos/mutaciones temporales, `vision` y `research` solo `artifacts/`. El lanzador lo pasa en `AGY_ROLE` y el gate registra rol y decisión en `gate.log`.

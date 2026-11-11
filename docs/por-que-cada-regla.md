@@ -84,5 +84,8 @@ No ejecuta suites: comprueba que el ciclo se cumplió.
 | Nunca canalizar `rebase`, `merge` ni `commit`; conflictos los resuelve Claude | Rebases a medias | Incidente I-07 |
 | Orden de cierre: veredicto sobre HEAD → `check` → fast-forward → cierre de documentación en la rama principal | Que el veredicto deje de corresponder al commit integrado | Preventiva; consecuencia de atar el veredicto al commit |
 | Sin push ni publicación salvo petición explícita | Publicar sin que el autor lo decida | Regla del autor |
+| Integración autónoma cuando el ciclo se cumple (auditoría, QA aprobado sobre el commit exacto, `relevo check`); se pregunta solo ante un doble rechazo de QA, una decisión de diseño fuera del encargo o una contradicción | Que el usuario no tenga que aprobar trabajo ya verificado y el flujo no se detenga | Petición del autor (2026-11-10); decisión 02, «Autonomía y paralelismo» |
+| Tras un rebase, verificación y QA de nuevo sobre el nuevo HEAD | Integrar un commit que nadie verificó | Preventiva; consecuencia de atar el veredicto al commit |
+| Paralelismo con agentes de `relevo run` desde una sola sesión de Claude Code, no con sesiones aparte; las que existan se resuelven solas | Sesiones paradas esperando al usuario y contexto duplicado | Petición del autor (2026-11-10), tras tres sesiones paralelas que se detuvieron a pedir aprobación |
 | `AGENTS.md` y `CLAUDE.md` por debajo de 20.000 bytes | Reglas truncadas | Incidente I-06 |
 | Sin `--sandbox` ni `-i` con agy | Worktrees rotos; bloqueo esperando confianza | Incidentes I-03 e I-04 |

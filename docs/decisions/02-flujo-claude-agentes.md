@@ -54,12 +54,21 @@ El origen de cada regla de este flujo, de la puerta de permisos, de `relevo chec
      - Sugerencia de suites por área según patrones de rutas modificadas.
      - Detección de nuevos colores fijos en archivos de interfaz (salvo `--allow-colors`).
      - Rechazo automático de veredictos aprobados que contengan hallazgos de severidad alta.
-  9. **Integración fast-forward**: Claude integra la rama en la rama principal.
+  9. **Integración fast-forward**: Claude integra la rama en la rama principal, sin pedir aprobación al usuario (ver «Autonomía y paralelismo»).
   10. **Commit de cierre de documentación**: se formaliza en la rama principal el cierre documental atado al commit integrado.
   11. **Limpieza**: eliminación del worktree y de la rama temporal.
 - Claude hace los commits del ciclo; nunca hace push sin petición explícita del usuario.
 - Quien escribe el código no emite el veredicto.
 - Tras cada corrección de interfaz, se realiza una segunda revisión visual de las capturas nuevas (rol `vision`) confirmando punto por punto la resolución de los hallazgos.
+
+## Autonomía y paralelismo (2026-11-10)
+
+- **Integración autónoma.** Cuando el ciclo se cumple (auditoría propia con mutaciones, veredicto de QA aprobado sobre el commit exacto que se integra, `relevo check` y pruebas en verde), Claude integra en la rama principal y cierra la tarea con `relevo task done` **sin pedir aprobación al usuario**. Los commits en la rama de la tarea tampoco la requieren.
+- **Tras un rebase el veredicto deja de valer**: el commit cambia, así que se repiten la verificación y QA sobre el nuevo HEAD antes de integrar.
+- **Cuándo se pregunta al usuario**: solo si QA rechaza dos veces la misma tarea, si hace falta una decisión de diseño que el encargo no cubre, si algo no cuadra (encargo, código y resultados se contradicen) o antes de una acción hacia fuera. El push y cualquier publicación siguen requiriendo petición explícita.
+- **Paralelismo con agentes, no con sesiones.** El trabajo en paralelo se hace lanzando varios agentes con `relevo run` desde la misma sesión de Claude Code, cada tarea en su worktree (`relevo task new`), y se sigue con `relevo watch`. Claude no abre sesiones de Claude Code aparte para tareas de relevo. Si existe alguna (porque el usuario la abrió), aplica estas mismas reglas y se resuelve sola, sin quedarse esperando al usuario.
+- **Tareas que tocan los mismos archivos** no se lanzan a la vez. Si coinciden, se integran de una en una: la siguiente se rebasa sobre la rama principal y vuelve a pasar el ciclo.
+- Origen: petición del autor, después de que tres sesiones paralelas de Claude Code se detuvieran a pedir aprobación para integrar trabajo ya aprobado por QA.
 
 ## Varios proveedores
 
