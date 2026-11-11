@@ -1,5 +1,9 @@
 /* Definition-of-done rules used by scripts/check-change.cjs. No git or browser is used. */
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync, spawnSync } = require('node:child_process');
 const { evaluate } = require('../lib/check-change.cjs');
 
 const failures = [];
@@ -161,6 +165,143 @@ test('un veredicto inválido produce el fallo "El veredicto no es válido" y no 
   assert.ok(r.failures.some((f) => f.includes('El veredicto no es válido')));
   assert.ok(!r.failures.some((f) => /no del actual/.test(f)));
 });
+
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'relevo-check-wt-'));
+
+function makeRepoWithWorktree(name, decisions = { dir: 'docs/decisions', index: 'INDICE.md' }) {
+  const repo = path.resolve(tmpDir, name);
+  fs.mkdirSync(repo, { recursive: true });
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+  execFileSync('git', ['config', 'user.email', 'test@relevo.local'], { cwd: repo });
+  execFileSync('git', ['config', 'user.name', 'Relevo Test'], { cwd: repo });
+  execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: repo });
+
+  const relevoConfig = {
+    check: {
+      baseBranch: 'main',
+      sourcePattern: '^lib/',
+      testPattern: '^test/[\\w./-]+$',
+      roadmap: null,
+      decisions,
+    },
+  };
+  fs.writeFileSync(path.join(repo, 'relevo.config.json'), JSON.stringify(relevoConfig, null, 2) + '\n');
+  fs.writeFileSync(path.join(repo, '.gitignore'), '.qa-verdict.json\n.worktrees/\n');
+  if (decisions?.index) {
+    fs.writeFileSync(path.join(repo, decisions.index), '# Decisiones\n');
+  } else {
+    fs.writeFileSync(path.join(repo, 'AGENTS.md'), '# Agentes\n');
+  }
+  fs.mkdirSync(path.join(repo, 'lib'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'lib', 'base.cjs'), "'use strict';\n");
+
+  execFileSync('git', ['add', '-A'], { cwd: repo });
+  execFileSync('git', ['commit', '-q', '-m', 'inicial'], { cwd: repo });
+
+  execFileSync('git', ['worktree', 'add', '-q', '.worktrees/t', '-b', 't'], { cwd: repo });
+  const wt = path.resolve(repo, '.worktrees', 't');
+  return { repo, wt };
+}
+
+function runCheck(cwd) {
+  const res = spawnSync(process.execPath, [path.join(__dirname, '..', 'bin', 'relevo.cjs'), 'check'], { cwd, encoding: 'utf8' });
+  return { status: res.status, output: (res.stdout || '') + (res.stderr || '') };
+}
+
+test('check en un worktree lee el veredicto de la raíz del worktree', () => {
+  const { repo, wt } = makeRepoWithWorktree('a');
+  fs.mkdirSync(path.join(wt, 'lib'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'test'), { recursive: true });
+  fs.writeFileSync(path.join(wt, 'lib', 'a.cjs'), "'use strict';\nmodule.exports = 1;\n");
+  fs.writeFileSync(path.join(wt, 'test', 'a.test.cjs'), "'use strict';\n");
+  execFileSync('git', ['add', '-A'], { cwd: wt });
+  execFileSync('git', ['commit', '-q', '-m', 'cambio'], { cwd: wt });
+
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: wt, encoding: 'utf8' }).trim();
+  const verdictOk = {
+    version: 1,
+    commit: head,
+    branch: 't',
+    verdict: 'aprobado',
+    checkedAt: new Date().toISOString(),
+    suites: [{ name: 'test', passed: true }],
+    findings: [],
+  };
+  fs.writeFileSync(path.join(wt, '.qa-verdict.json'), JSON.stringify(verdictOk, null, 2) + '\n');
+
+  const verdictRechazado = {
+    version: 1,
+    commit: head,
+    branch: 't',
+    verdict: 'rechazado',
+    checkedAt: new Date().toISOString(),
+    suites: [{ name: 'test', passed: true }],
+    findings: [],
+  };
+  fs.writeFileSync(path.join(repo, '.qa-verdict.json'), JSON.stringify(verdictRechazado, null, 2) + '\n');
+
+  const { status, output } = runCheck(wt);
+  assert.equal(status, 0, output);
+  assert.ok(output.includes('Cumple los controles'), output);
+  assert.ok(!output.includes('Falta .qa-verdict.json'), output);
+  assert.ok(!output.includes('rechazado'), output);
+});
+
+test('check en un worktree lee el índice de decisiones de la rama', () => {
+  const { wt } = makeRepoWithWorktree('b');
+  fs.mkdirSync(path.join(wt, 'docs', 'decisions'), { recursive: true });
+  fs.writeFileSync(path.join(wt, 'docs', 'decisions', '01-nueva.md'), '# Nueva\n');
+  fs.appendFileSync(path.join(wt, 'INDICE.md'), '- [01-nueva.md](docs/decisions/01-nueva.md)\n');
+  execFileSync('git', ['add', '-A'], { cwd: wt });
+  execFileSync('git', ['commit', '-q', '-m', 'decision'], { cwd: wt });
+
+  const { status, output } = runCheck(wt);
+  assert.equal(status, 0, output);
+  assert.ok(!output.includes('no está en el índice'), output);
+});
+
+test('check en un worktree lee AGENTS.md de la rama cuando no hay índice configurado', () => {
+  const { wt } = makeRepoWithWorktree('d', { dir: 'docs/decisions', index: '' });
+  fs.mkdirSync(path.join(wt, 'docs', 'decisions'), { recursive: true });
+  fs.writeFileSync(path.join(wt, 'docs', 'decisions', '01-nueva.md'), '# Nueva\n');
+  fs.appendFileSync(path.join(wt, 'AGENTS.md'), '- [01-nueva.md](docs/decisions/01-nueva.md)\n');
+  execFileSync('git', ['add', '-A'], { cwd: wt });
+  execFileSync('git', ['commit', '-q', '-m', 'decision'], { cwd: wt });
+
+  const { status, output } = runCheck(wt);
+  assert.equal(status, 0, output);
+  assert.ok(!output.includes('no está en el índice'), output);
+});
+
+test('check en un worktree sigue fallando sin veredicto en el worktree', () => {
+  const { repo, wt } = makeRepoWithWorktree('c');
+  fs.mkdirSync(path.join(wt, 'lib'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'test'), { recursive: true });
+  fs.writeFileSync(path.join(wt, 'lib', 'a.cjs'), "'use strict';\nmodule.exports = 1;\n");
+  fs.writeFileSync(path.join(wt, 'test', 'a.test.cjs'), "'use strict';\n");
+  execFileSync('git', ['add', '-A'], { cwd: wt });
+  execFileSync('git', ['commit', '-q', '-m', 'cambio'], { cwd: wt });
+
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: wt, encoding: 'utf8' }).trim();
+  const verdictOk = {
+    version: 1,
+    commit: head,
+    branch: 't',
+    verdict: 'aprobado',
+    checkedAt: new Date().toISOString(),
+    suites: [{ name: 'test', passed: true }],
+    findings: [],
+  };
+  fs.writeFileSync(path.join(repo, '.qa-verdict.json'), JSON.stringify(verdictOk, null, 2) + '\n');
+
+  const { status, output } = runCheck(wt);
+  assert.equal(status, 1, output);
+  assert.ok(output.includes('Falta .qa-verdict.json'), output);
+});
+
+try {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+} catch { /* ignorar */ }
 
 console.log(`\ncheck:change rules: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
