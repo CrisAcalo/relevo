@@ -7,7 +7,7 @@
 | `init [--dry-run] [--force]` | Instala en el proyecto la puerta de permisos, `hooks.json`, skills, agentes, `.agents/skills.json`, `relevo.config.json`, el registro `.agents/relevo.lock.json` y las líneas de `.gitignore`. Idempotente; nunca sobrescribe `relevo.config.json` ni `.agents/skills.json`. | Sí |
 | `doctor [--json]` | Comprueba el entorno y la instalación (ver abajo). Código 1 si hay algún error. | No |
 | `task new <nombre> [--from <ref>]` | Crea `<worktreesDir>/<nombre>`, la rama `<taskBranchPrefix><nombre>` y enlaza `node_modules` (junction en Windows, symlink en el resto). | Sí |
-| `task done <nombre> [--force]` | Cierra la tarea: exige rama integrada en `check.baseBranch` y worktree sin cambios (salvo `--force`); borra primero el enlace de `node_modules` sin recursión, luego el worktree y la rama. | Sí |
+| `task done <nombre> [--force]` | Cierra la tarea: exige rama integrada en `check.baseBranch` y worktree sin cambios (salvo `--force`); borra primero el enlace de `node_modules` sin recursión, luego el worktree y la rama. Retoma un cierre interrumpido: si el worktree ya no está registrado, borra la carpeta solo si está vacía (o solo contiene el enlace de node_modules); si la carpeta ya no existe, hace git worktree prune; y borra la rama si queda. Se niega si el directorio actual está dentro de la tarea. | Sí |
 | `task list` | Tareas abiertas con su rama, si está integrada y si tiene cambios. | No |
 | `run …` | Lanza un agente (ver skill `delegar-agy`). | Registros en `runsDir` |
 | `watch [--once \| --list \| <NN>]` | Panel en vivo de los agentes. | No |

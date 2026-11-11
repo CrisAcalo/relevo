@@ -267,6 +267,223 @@ test('CLI bin/relevo.cjs task new / list / done', () => {
   assert.equal(fs.existsSync(path.join(repo, '.worktrees', 'cli-task')), false);
 });
 
+test('(k) cierre interrumpido: worktree desregistrado con la carpeta vacía → task done la borra y borra la rama', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'demo', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'demo');
+  const wtNm = path.join(wtDir, 'node_modules');
+  try {
+    fs.unlinkSync(wtNm);
+  } catch (err) {
+    if (process.platform === 'win32') {
+      fs.rmdirSync(wtNm);
+    } else {
+      throw err;
+    }
+  }
+  execFileSync('git', ['worktree', 'remove', '.worktrees/demo'], { cwd: repo });
+  fs.mkdirSync(wtDir);
+
+  taskDone({ name: 'demo', cwd: repo, silent: true });
+
+  assert.equal(fs.existsSync(wtDir), false);
+  const branchOut = execFileSync('git', ['branch', '--list', 'relevo/demo'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(branchOut, '');
+
+  const centinelaRoot = path.join(repo, 'node_modules', 'centinela.txt');
+  assert.ok(fs.existsSync(centinelaRoot));
+  assert.equal(fs.readFileSync(centinelaRoot, 'utf8'), 'centinela-ok\n');
+});
+
+test('(l) carpeta desregistrada con un archivo dentro → error y no se borra nada', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'demo', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'demo');
+  const wtNm = path.join(wtDir, 'node_modules');
+  try {
+    fs.unlinkSync(wtNm);
+  } catch (err) {
+    if (process.platform === 'win32') {
+      fs.rmdirSync(wtNm);
+    } else {
+      throw err;
+    }
+  }
+  execFileSync('git', ['worktree', 'remove', '.worktrees/demo'], { cwd: repo });
+  fs.mkdirSync(wtDir);
+  const restoFile = path.join(wtDir, 'resto.txt');
+  fs.writeFileSync(restoFile, 'contenido\n');
+
+  assert.throws(
+    () => taskDone({ name: 'demo', cwd: repo, silent: true }),
+    /ya no es un worktree registrado/
+  );
+
+  assert.ok(fs.existsSync(restoFile));
+  const branchOut = execFileSync('git', ['branch', '--list', 'relevo/demo'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.ok(branchOut.includes('relevo/demo'));
+
+  const centinelaRoot = path.join(repo, 'node_modules', 'centinela.txt');
+  assert.ok(fs.existsSync(centinelaRoot));
+  assert.equal(fs.readFileSync(centinelaRoot, 'utf8'), 'centinela-ok\n');
+});
+
+test('(m) carpeta borrada pero worktree registrado → task done hace prune y borra la rama', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'demo', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'demo');
+  const wtNm = path.join(wtDir, 'node_modules');
+  try {
+    fs.unlinkSync(wtNm);
+  } catch (err) {
+    if (process.platform === 'win32') {
+      fs.rmdirSync(wtNm);
+    } else {
+      throw err;
+    }
+  }
+  fs.rmSync(wtDir, { recursive: true, force: true });
+
+  taskDone({ name: 'demo', cwd: repo, silent: true });
+
+  const wtList = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: repo, encoding: 'utf8' });
+  assert.ok(!/\.worktrees\/demo/.test(wtList));
+
+  const branchOut = execFileSync('git', ['branch', '--list', 'relevo/demo'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(branchOut, '');
+
+  const centinelaRoot = path.join(repo, 'node_modules', 'centinela.txt');
+  assert.ok(fs.existsSync(centinelaRoot));
+  assert.equal(fs.readFileSync(centinelaRoot, 'utf8'), 'centinela-ok\n');
+});
+
+test('(n) solo queda la rama → task done la borra', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'demo', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'demo');
+  const wtNm = path.join(wtDir, 'node_modules');
+  try {
+    fs.unlinkSync(wtNm);
+  } catch (err) {
+    if (process.platform === 'win32') {
+      fs.rmdirSync(wtNm);
+    } else {
+      throw err;
+    }
+  }
+  execFileSync('git', ['worktree', 'remove', '.worktrees/demo'], { cwd: repo });
+
+  taskDone({ name: 'demo', cwd: repo, silent: true });
+
+  const branchOut = execFileSync('git', ['branch', '--list', 'relevo/demo'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(branchOut, '');
+
+  const centinelaRoot = path.join(repo, 'node_modules', 'centinela.txt');
+  assert.ok(fs.existsSync(centinelaRoot));
+  assert.equal(fs.readFileSync(centinelaRoot, 'utf8'), 'centinela-ok\n');
+});
+
+test('(o) no existe nada → error', () => {
+  const repo = makeGitRepo(tmpBase);
+
+  assert.throws(
+    () => taskDone({ name: 'demo', cwd: repo, silent: true }),
+    /No existe la tarea "demo"/
+  );
+
+  const centinelaRoot = path.join(repo, 'node_modules', 'centinela.txt');
+  assert.ok(fs.existsSync(centinelaRoot));
+  assert.equal(fs.readFileSync(centinelaRoot, 'utf8'), 'centinela-ok\n');
+});
+
+test('(p) desregistrada con carpeta vacía y rama sin integrar → error sin --force y no se borra nada', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'demo', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'demo');
+  const nuevoFile = path.join(wtDir, 'nuevo.txt');
+  fs.writeFileSync(nuevoFile, 'contenido nuevo\n');
+  execFileSync('git', ['add', 'nuevo.txt'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'x', '-q'], { cwd: wtDir });
+
+  const wtNm = path.join(wtDir, 'node_modules');
+  try {
+    fs.unlinkSync(wtNm);
+  } catch (err) {
+    if (process.platform === 'win32') {
+      fs.rmdirSync(wtNm);
+    } else {
+      throw err;
+    }
+  }
+  execFileSync('git', ['worktree', 'remove', '.worktrees/demo'], { cwd: repo });
+  fs.mkdirSync(wtDir);
+
+  assert.throws(
+    () => taskDone({ name: 'demo', cwd: repo, silent: true }),
+    /no está integrada/
+  );
+
+  assert.ok(fs.existsSync(wtDir));
+  const branchOut = execFileSync('git', ['branch', '--list', 'relevo/demo'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.ok(branchOut.includes('relevo/demo'));
+
+  const centinelaRoot = path.join(repo, 'node_modules', 'centinela.txt');
+  assert.ok(fs.existsSync(centinelaRoot));
+  assert.equal(fs.readFileSync(centinelaRoot, 'utf8'), 'centinela-ok\n');
+});
+
+test('(q) directorio actual dentro de la tarea → error y no se borra nada', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'demo', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'demo');
+
+  const prev = process.cwd();
+  process.chdir(wtDir);
+  try {
+    assert.throws(
+      () => taskDone({ name: 'demo', cwd: repo, silent: true }),
+      /Sal de/
+    );
+  } finally {
+    process.chdir(prev);
+  }
+
+  assert.ok(fs.existsSync(wtDir));
+  const branchOut = execFileSync('git', ['branch', '--list', 'relevo/demo'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.ok(branchOut.includes('relevo/demo'));
+
+  const centinelaRoot = path.join(repo, 'node_modules', 'centinela.txt');
+  assert.ok(fs.existsSync(centinelaRoot));
+  assert.equal(fs.readFileSync(centinelaRoot, 'utf8'), 'centinela-ok\n');
+});
+
+// Añadida por el auditor: el sobrante más probable tras un cierre a medias conserva el enlace a node_modules.
+test('(r) carpeta desregistrada con solo el enlace node_modules → task done quita el enlace, borra la carpeta y la rama', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'demo', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'demo');
+  const wtNm = path.join(wtDir, 'node_modules');
+  try {
+    fs.unlinkSync(wtNm);
+  } catch (err) {
+    if (process.platform === 'win32') fs.rmdirSync(wtNm);
+    else throw err;
+  }
+  execFileSync('git', ['worktree', 'remove', '.worktrees/demo'], { cwd: repo });
+  fs.mkdirSync(wtDir);
+  fs.symlinkSync(path.join(repo, 'node_modules'), wtNm, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.ok(fs.lstatSync(wtNm).isSymbolicLink());
+
+  taskDone({ name: 'demo', cwd: repo, silent: true });
+
+  assert.equal(fs.existsSync(wtDir), false);
+  const branchOut = execFileSync('git', ['branch', '--list', 'relevo/demo'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(branchOut, '');
+  const centinelaRoot = path.join(repo, 'node_modules', 'centinela.txt');
+  assert.ok(fs.existsSync(centinelaRoot));
+  assert.equal(fs.readFileSync(centinelaRoot, 'utf8'), 'centinela-ok\n');
+});
+
 // Limpieza general
 try {
   fs.rmSync(tmpBase, { recursive: true, force: true });
