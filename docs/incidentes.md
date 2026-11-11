@@ -148,3 +148,8 @@ Formato: síntoma observado → causa comprobada → regla resultante (dónde vi
 - **Síntoma:** con `{"gate":{"roleScopes":{"qa":["^lib/"]}}}` en `relevo.config.json`, los roles `docs`, `vision`, `research` y `review` pasaban de `deny` a `ask` al editar código y, con `always-proceed`, la edición se habría ejecutado.
 - **Causa:** la puerta sustituía el objeto `gate.roleScopes` entero en lugar de combinarlo con los valores por defecto; `lib/config.cjs` sí combinaba, así que `relevo doctor` no lo veía.
 - **Regla:** combinación por rol: un rol definido sustituye solo a ese rol, `null` explícito es la única forma de quitar una restricción y `[]` no permite editar nada. Detectado por Claude al plantear ampliar el ámbito de `qa`. (`lib/permission-gate.cjs`, `lib/config.cjs`; pruebas R1-R4 de `test/permission-gate.test.cjs`)
+
+### R-07 · La clave `__proto__` en la configuración se perdía al combinarla (auditoría, 2026-11-10)
+- **Síntoma:** con `{"gate":{"roleScopes":{"__proto__":"x"}}}` en `relevo.config.json`, `relevo doctor` daba la configuración por válida mientras la puerta la rechazaba y lo denegaba todo; con `["^lib/"]`, `loadConfig` perdía el rol y la puerta lo trataba como uno más.
+- **Causa:** `JSON.parse` crea `__proto__` como clave propia, pero `deepMerge` la copiaba con una asignación, que cambia el prototipo del objeto en lugar de crear la clave.
+- **Regla:** `__proto__` en cualquier nivel hace inválida la configuración, en `lib/config.cjs` y en la puerta. Detectado por Claude al revisar el barrido de QA de R-06, que no lo cubrió porque escribió la clave en un literal de objeto JS y `JSON.stringify` la omitió. (`lib/config.cjs`, `lib/permission-gate.cjs`; pruebas C1-C2 de `test/config.test.cjs` y R5-R6 de `test/permission-gate.test.cjs`)

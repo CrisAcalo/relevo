@@ -43,7 +43,7 @@ Todas las claves son opcionales.
 | `check.hardcodedColorFiles` | Archivos de interfaz sin colores fijos | `null` |
 | `check.areaSuites` | `[{ "pattern": "...", "suites": ["..."] }]` | `[]` |
 
-Una clave desconocida o un valor de tipo incorrecto es un error. Si `relevo.config.json` no es válido, la puerta de permisos deniega todo.
+Una clave desconocida o un valor de tipo incorrecto es un error. La clave `__proto__`, en cualquier nivel, también: al combinarla con los valores por defecto cambiaría el prototipo del objeto en lugar de crear la clave. Si `relevo.config.json` no es válido, la puerta de permisos deniega todo.
 
 ### Ámbito de edición por rol (`gate.roleScopes`)
 
