@@ -508,6 +508,55 @@ test('check en un worktree conserva el nombre completo del archivo modificado si
   assert.ok(!out.includes('(ib/base.cjs)'), out);
 });
 
+const repoSinCommits = path.resolve(tmpDir, 'repo-rama-sin-commits');
+fs.mkdirSync(repoSinCommits, { recursive: true });
+execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repoSinCommits });
+execFileSync('git', ['config', 'user.email', 'test@relevo.local'], { cwd: repoSinCommits });
+execFileSync('git', ['config', 'user.name', 'Relevo Test'], { cwd: repoSinCommits });
+execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: repoSinCommits });
+
+fs.writeFileSync(path.join(repoSinCommits, '.gitignore'), '.worktrees/\n');
+fs.writeFileSync(
+  path.join(repoSinCommits, 'relevo.config.json'),
+  JSON.stringify({ check: { roadmap: 'docs/hoja.md' } }, null, 2) + '\n'
+);
+
+fs.mkdirSync(path.join(repoSinCommits, 'docs'), { recursive: true });
+fs.mkdirSync(path.join(repoSinCommits, 'lib'), { recursive: true });
+fs.writeFileSync(path.join(repoSinCommits, 'docs', 'hoja.md'), '# Hoja v1\n');
+fs.writeFileSync(path.join(repoSinCommits, 'lib', 'x.cjs'), "'use strict';\n// v1\n");
+execFileSync('git', ['add', '-A'], { cwd: repoSinCommits });
+execFileSync('git', ['commit', '-q', '-m', 'inicial'], { cwd: repoSinCommits });
+
+fs.writeFileSync(path.join(repoSinCommits, 'docs', 'hoja.md'), '# Hoja v2\n');
+fs.writeFileSync(path.join(repoSinCommits, 'lib', 'x.cjs'), "'use strict';\n// v2\n");
+execFileSync('git', ['add', '-A'], { cwd: repoSinCommits });
+execFileSync('git', ['commit', '-q', '-m', 'segundo commit en main'], { cwd: repoSinCommits });
+
+execFileSync('git', ['worktree', 'add', '-q', '.worktrees/t', '-b', 't'], { cwd: repoSinCommits });
+const wtSinCommits = path.resolve(repoSinCommits, '.worktrees', 't');
+fs.writeFileSync(path.join(wtSinCommits, 'lib', 'y.cjs'), "'use strict';\n// sin confirmar\n");
+
+test('check en una rama sin commits no usa HEAD~1 (rama-vacia)', () => {
+  const res = spawnSync(process.execPath, [path.join(__dirname, '..', 'bin', 'relevo.cjs'), 'check', '--docs-only'], { cwd: wtSinCommits, encoding: 'utf8' });
+  const out = (res.stdout || '') + (res.stderr || '');
+  assert.equal(res.status, 1, out);
+  assert.ok(out.includes('No se actualizó docs/hoja.md'), out);
+  assert.ok(!out.includes('lib/x.cjs'), out);
+  const match = out.match(/(\d+) archivos cambiados/);
+  assert.ok(match, out);
+  assert.equal(match[1], '1', out);
+});
+
+test('check en la rama base sin cambios compara el último commit (en-base)', () => {
+  const res = spawnSync(process.execPath, [path.join(__dirname, '..', 'bin', 'relevo.cjs'), 'check'], { cwd: repoSinCommits, encoding: 'utf8' });
+  const out = (res.stdout || '') + (res.stderr || '');
+  assert.equal(res.status, 0, out);
+  const match = out.match(/(\d+) archivos cambiados/);
+  assert.ok(match, out);
+  assert.ok(parseInt(match[1], 10) >= 2, out);
+});
+
 try {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 } catch { /* ignorar */ }
