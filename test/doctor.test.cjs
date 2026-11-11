@@ -210,6 +210,7 @@ try {
     const gateCheck = res.parsed.checks.find((c) => c.id === 'gate');
     assert.equal(gateCheck.status, 'aviso');
     assert.ok(gateCheck.message.includes('relevo update'));
+    assert.ok(gateCheck.message.includes('relevo update --apply --force'));
 
     // Restauramos el contenido original
     fs.writeFileSync(gatePath, originalContent, 'utf8');

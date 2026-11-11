@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { init, assertGitRoot } = require('../lib/init.cjs');
+const { DEFAULTS, loadConfig } = require('../lib/config.cjs');
 
 const failures = [];
 let passed = 0;
@@ -211,6 +212,29 @@ test('init crea .agents/relevo.lock.json con los hashes correctos', () => {
     const actualHash = crypto.createHash('sha256').update(content).digest('hex');
     assert.equal(actualHash, expectedHash, `El hash de ${relPath} debe coincidir con el del lock`);
   }
+});
+
+test('(cfg-min) tras init en un repositorio vacío, relevo.config.json contiene exactamente {}\\n y loadConfig devuelve los valores por defecto', () => {
+  const repo = makeGitRepo(tmpBase);
+  init({ cwd: repo, silent: true });
+  const configPath = path.join(repo, 'relevo.config.json');
+  assert.equal(fs.readFileSync(configPath, 'utf8'), '{}\n');
+  assert.deepEqual(loadConfig(repo), DEFAULTS);
+});
+
+test('(puerta-antigua) si .agents/hooks/permission-gate.cjs existe con otro contenido, init no lo modifica y status es desactualizada con nota', () => {
+  const repo = makeGitRepo(tmpBase);
+  const gatePath = path.join(repo, '.agents', 'hooks', 'permission-gate.cjs');
+  fs.mkdirSync(path.dirname(gatePath), { recursive: true });
+  const customGateContent = '// puerta antigua personalizada\n';
+  fs.writeFileSync(gatePath, customGateContent, 'utf8');
+
+  const r = init({ cwd: repo, silent: true });
+  assert.equal(fs.readFileSync(gatePath, 'utf8'), customGateContent);
+  const gateEntry = r.results.find((e) => e.file === '.agents/hooks/permission-gate.cjs');
+  assert.ok(gateEntry, 'debe existir la entrada de permission-gate.cjs en results');
+  assert.equal(gateEntry.status, 'desactualizada');
+  assert.ok(gateEntry.note && gateEntry.note.includes('relevo update --apply --force'));
 });
 
 // Limpieza general

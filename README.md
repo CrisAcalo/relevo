@@ -73,6 +73,11 @@ relevo init
 relevo doctor
 ```
 
+> [!TIP]
+> **Si `relevo` no se encuentra tras `npm link`**, la carpeta global de npm no está en el PATH. Ocurre con algunos gestores de versiones de Node, como nvm para Windows. Comprueba `npm prefix -g`, abre una terminal nueva o vuelve a seleccionar la versión con tu gestor (por ejemplo `nvm use <versión>`). Mientras tanto, funciona igual con `node <ruta-a-relevo>/bin/relevo.cjs <comando>`.
+
+¿Tu proyecto ya tenía una copia del flujo de agentes? Sigue [Migrar desde una copia incrustada](docs/configuracion.md#migrar-desde-una-copia-incrustada).
+
 `relevo init` añade al proyecto la configuración, las skills de Claude Code, los agentes `qa` y `documentalista` y la puerta de permisos. Después, rellena los marcadores `<<PROYECTO: …>>` de las plantillas y aplica la [configuración global de agy](templates/agy-settings.example.md). Detalles en [Configuración](docs/configuracion.md).
 
 **Una tarea de principio a fin:**

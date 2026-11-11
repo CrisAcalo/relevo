@@ -71,3 +71,15 @@ La configuración del propio relevo:
   }
 }
 ```
+
+## Migrar desde una copia incrustada
+
+Si el proyecto ya tenía su propia copia del flujo (scripts de lanzador, panel o check, una puerta en `.agents/hooks/` o agentes propios):
+
+1. `relevo init`: conserva lo personalizado y marca la puerta antigua como `[desactualizada]`.
+2. `relevo update --apply --force`: sustituye la puerta (no se personaliza; sus listas se configuran en `relevo.config.json`) y deja junto a cada skill personalizada su plantilla nueva como `<archivo>.relevo-new` para integrarla a mano.
+3. Traslada a `relevo.config.json` las reglas que tuviera el check antiguo (`check.roadmap`, `check.decisions`, `check.hardcodedColorFiles`, `check.areaSuites`, `check.testCommand`), solo lo que difiera de los valores por defecto.
+4. Agentes: quédate con un único `qa` y un único `documentalista`. El `qa` de relevo muta copias en `artifacts/qa-mutantes/` porque la puerta le impide editar código; un agente propio que mute el código en el sitio dejará de funcionar.
+5. Retira los scripts antiguos y sus pruebas, apunta los alias de `package.json` a `relevo …` y, si el proyecto restringe los archivos de la raíz, permite `relevo.config.json`.
+6. Comprueba con `relevo doctor` y pasa una primera tarea por `relevo task new` → `relevo run` → `relevo task integrate`.
+
