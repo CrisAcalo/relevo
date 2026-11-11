@@ -64,11 +64,25 @@ El origen de cada regla de este flujo, de la puerta de permisos, de `relevo chec
 ## Autonomía y paralelismo (2026-11-10)
 
 - **Integración autónoma.** Cuando el ciclo se cumple (auditoría propia con mutaciones, veredicto de QA aprobado sobre el commit exacto que se integra, `relevo check` y pruebas en verde), Claude integra en la rama principal y cierra la tarea con `relevo task done` **sin pedir aprobación al usuario**. Los commits en la rama de la tarea tampoco la requieren.
-- **Tras un rebase el veredicto deja de valer**: el commit cambia, así que se repiten la verificación y QA sobre el nuevo HEAD antes de integrar.
+- **Tras un rebase sin conflictos el veredicto sigue valiendo** si el parche de la tarea es idéntico (`relevo check` lo compara con `git patch-id`) y las pruebas pasan sobre el nuevo HEAD (`relevo task integrate` las ejecuta). Si el rebase cambió el parche (hubo conflictos o se resolvieron a mano), se repiten la verificación y QA.
 - **Cuándo se pregunta al usuario**: solo si QA rechaza dos veces la misma tarea, si hace falta una decisión de diseño que el encargo no cubre, si algo no cuadra (encargo, código y resultados se contradicen) o antes de una acción hacia fuera. El push y cualquier publicación siguen requiriendo petición explícita.
 - **Paralelismo con agentes, no con sesiones.** El trabajo en paralelo se hace lanzando varios agentes con `relevo run` desde la misma sesión de Claude Code, cada tarea en su worktree (`relevo task new`), y se sigue con `relevo watch`. Claude no abre sesiones de Claude Code aparte para tareas de relevo. Si existe alguna (porque el usuario la abrió), aplica estas mismas reglas y se resuelve sola, sin quedarse esperando al usuario.
 - **Tareas que tocan los mismos archivos** no se lanzan a la vez. Si coinciden, se integran de una en una: la siguiente se rebasa sobre la rama principal y vuelve a pasar el ciclo.
 - Origen: petición del autor, después de que tres sesiones paralelas de Claude Code se detuvieran a pedir aprobación para integrar trabajo ya aprobado por QA.
+
+## Ciclo proporcional (2026-11-10)
+
+El ciclo completo es caro: cada QA tarda de 6 a 11 minutos y unos 200k tokens, y en una tarea se repitió cuatro veces por rebases. El autor pidió que lo simple no tarde tanto. El ciclo se ajusta al riesgo del cambio:
+
+| Ciclo | Cuándo | Pasos |
+|---|---|---|
+| **Ligero** | Documentación; o código acotado (pocos archivos, con pruebas) **fuera** de las zonas críticas | Un agente `coder` con código, pruebas y documentación en el mismo encargo → auditoría de Claude con mutaciones → `relevo task integrate <tarea> --sin-qa "<motivo>"` |
+| **Completo** | Zonas críticas o cambios grandes | Lo anterior + QA independiente; `relevo task integrate <tarea>` exige su veredicto |
+
+- **Zonas críticas** (siempre ciclo completo): las que deciden qué puede hacer un agente o qué se integra, y las que borran. En relevo: `lib/permission-gate.cjs`, `lib/check-change.cjs`, `lib/verdict.cjs`, `lib/config.cjs` (carga de la política) y el borrado de `lib/task.cjs`. Cada proyecto declara las suyas en la skill `delegar-agy`. Evidencia: los dos QA que rechazaron trabajo lo hicieron sobre la puerta de permisos, con huecos que la auditoría no vio.
+- **La documentación la escribe el `coder` en el mismo encargo**, con el texto que dicta Claude; el agente `docs` queda para trabajo solo de documentación de cierto tamaño.
+- **Git lo hace un comando**: `relevo task integrate` rebasa si la base avanzó (aborta y avisa si hay conflictos), ejecuta las pruebas (`check.testCommand`), pasa `relevo check`, integra por fast-forward y cierra la tarea. Claude no encadena esos pasos a mano.
+- **Paralelo por defecto**: las tareas independientes (archivos distintos) se lanzan a la vez con varios `relevo run`.
 
 ## Varios proveedores
 

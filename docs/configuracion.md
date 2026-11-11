@@ -40,6 +40,7 @@ Todas las claves son opcionales.
 | `check.roadmap` | Hoja de ruta que debe actualizarse | `null` |
 | `check.decisions.dir` / `.index` | Carpeta de decisiones y archivo índice | `null` |
 | `check.verdictFile` | Veredicto de QA | `.qa-verdict.json` |
+| `check.testCommand` | Programa y argumentos de las pruebas que ejecuta `relevo task integrate` en el worktree (p. ej. `["npm", "test"]`; en Windows, `npm` se ejecuta como `npm.cmd`) | `null` (no ejecuta pruebas) |
 | `check.hardcodedColorFiles` | Archivos de interfaz sin colores fijos | `null` |
 | `check.areaSuites` | `[{ "pattern": "...", "suites": ["..."] }]` | `[]` |
 

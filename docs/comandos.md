@@ -8,6 +8,7 @@
 | `doctor [--json]` | Comprueba el entorno y la instalación (ver abajo). Código 1 si hay algún error. | No |
 | `task new <nombre> [--from <ref>]` | Crea `<worktreesDir>/<nombre>`, la rama `<taskBranchPrefix><nombre>` y enlaza `node_modules` (junction en Windows, symlink en el resto). | Sí |
 | `task done <nombre> [--force]` | Cierra la tarea: exige rama integrada en `check.baseBranch` y worktree sin cambios (salvo `--force`); borra primero el enlace de `node_modules` sin recursión, luego el worktree y la rama. Retoma un cierre interrumpido: si el worktree ya no está registrado, borra la carpeta solo si está vacía (o solo contiene el enlace de node_modules); si la carpeta ya no existe, hace git worktree prune; y borra la rama si queda. Se niega si el directorio actual está dentro de la tarea. | Sí |
+| `task integrate <nombre> [--sin-qa "<motivo>"] [--sin-pruebas]` | Desde la rama base del repositorio principal, sin cambios sin confirmar: rebasa la rama de la tarea si la base avanzó (con conflictos, aborta el rebase y avisa), ejecuta `check.testCommand` en el worktree, pasa `relevo check` (con `--sin-qa` si se indica), integra por fast-forward y cierra la tarea con `task done`. Nunca hace push. | Sí |
 | `task list` | Tareas abiertas con su rama, si está integrada y si tiene cambios. | No |
 | `run …` | Lanza un agente (ver skill `delegar-agy`). | Registros en `runsDir` |
 | `watch [--once \| --list \| <NN>]` | Panel en vivo de los agentes. | No |
@@ -52,12 +53,12 @@ Consulta `agy -p /usage`, que no consume tokens, y distingue grupos de cupo (Gem
 Compara la rama actual con su base (`git merge-base`). No ejecuta suites: comprueba que el ciclo se cumplió. Falla si:
 
 - Cambia código fuente (`check.sourcePattern`) sin tocar pruebas (`check.testPattern`), salvo `--no-tests-reason "<motivo>"`.
-- Falta el veredicto de QA, no cumple el esquema (ver abajo), es de otro commit, no está `aprobado`, tiene suites fallidas o hallazgos de severidad alta.
+- Falta el veredicto de QA (salvo `--sin-qa "<motivo>"`, para el ciclo ligero), no cumple el esquema (ver abajo), es de otro commit con un parche distinto, no está `aprobado`, tiene suites fallidas o hallazgos de severidad alta. Un veredicto de un commit anterior vale si el parche de la tarea es idéntico (`git patch-id`): es el caso de un rebase sin conflictos.
 - Hay cambios sin commit cuando el veredicto debe corresponder a un commit.
 - No se actualizó `check.roadmap` o una decisión nueva no aparece en `check.decisions.index`.
 - Hay colores fijos nuevos en `check.hardcodedColorFiles`, salvo `--allow-colors "<motivo>"`.
 
-También sugiere las suites E2E del área tocada (`check.areaSuites`). Opciones: `--base <ref>`, `--docs-only`.
+También sugiere las suites E2E del área tocada (`check.areaSuites`). Opciones: `--base <ref>`, `--docs-only`, `--sin-qa "<motivo>"`.
 
 Se ejecuta en el worktree de la tarea. La configuración (`relevo.config.json`) se lee de la raíz del repositorio principal, pero el veredicto (`check.verdictFile`) y el índice de decisiones (`check.decisions.index`, o `AGENTS.md` si no hay índice) se leen de la raíz del **worktree actual** (`git rev-parse --show-toplevel`): son de la rama que se comprueba. Un veredicto en la raíz principal no cuenta para un worktree.
 

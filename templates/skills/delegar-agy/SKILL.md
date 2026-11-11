@@ -23,18 +23,20 @@ Nunca `claude-*` ni `gpt-oss-*` dentro de agy.
 ## Preparar una tarea de código
 
 ```bash
-git worktree add .worktrees/<tarea> -b <tarea> HEAD
-```
-En Windows (PowerShell):
-```powershell
-New-Item -ItemType Junction -Path ".worktrees\<tarea>\node_modules" -Target "$PWD\node_modules"
-```
-En Linux / macOS:
-```bash
-ln -s "$PWD/node_modules" ".worktrees/<tarea>/node_modules"
+relevo task new <tarea>          # worktree .worktrees/<tarea>, rama relevo/<tarea>, node_modules enlazado
+relevo task integrate <tarea>    # al terminar: rebase si hace falta, pruebas, check, fast-forward y cierre
 ```
 
-`.worktrees/` debe estar en `.gitignore` (configurable en `worktreesDir`). La configuración de hooks `.agents/` viaja con la rama o se hereda del proyecto.
+`.worktrees/` debe estar en `.gitignore` (configurable en `worktreesDir`). La configuración de hooks `.agents/` viaja con la rama o se hereda del proyecto. No encadenar a mano rebase, check, merge y limpieza: lo hace `relevo task integrate`.
+
+## Ciclo según el riesgo
+
+| Ciclo | Cuándo | Pasos |
+|---|---|---|
+| **Ligero** | Documentación, o código acotado con pruebas fuera de las zonas críticas | `coder` (código, pruebas y documentación en un encargo) → auditoría con mutaciones → `relevo task integrate <tarea> --sin-qa "<motivo>"` |
+| **Completo** | Zonas críticas o cambios grandes | Lo anterior + QA independiente; `relevo task integrate <tarea>` |
+
+Zonas críticas (siempre ciclo completo): <<PROYECTO: zonas críticas, ej. autenticación, permisos, pagos, migraciones, borrado de datos>>. Tareas independientes, en paralelo por defecto.
 
 ## Ejecutar (siempre en segundo plano, headless)
 
@@ -92,7 +94,7 @@ Delicado = persistencia/migraciones, concurrencia, render/exportación/determini
 ## Integración segura (Claude)
 
 - **Claude hace los commits del ciclo** (código, documentación, cierre); nunca hace push salvo petición explícita del usuario.
-- **Integración autónoma**: cuando el ciclo se cumple (auditoría propia con mutaciones, veredicto de QA aprobado sobre el commit exacto que se integra, `relevo check` y pruebas en verde), Claude integra en la rama principal y cierra la tarea con `relevo task done` sin pedir aprobación. Tras un rebase, el veredicto deja de valer: repetir verificación y QA sobre el nuevo HEAD. Preguntar al usuario solo si QA rechaza dos veces la misma tarea, si hace falta una decisión de diseño que el encargo no cubre, si algo no cuadra o antes de una acción hacia fuera (push, publicación).
+- **Integración autónoma**: cuando el ciclo se cumple (auditoría propia con mutaciones, veredicto de QA aprobado sobre el commit exacto que se integra, `relevo check` y pruebas en verde), Claude integra con `relevo task integrate <tarea>` sin pedir aprobación. Un rebase sin conflictos conserva el veredicto si el parche es idéntico (lo comprueba `relevo check`); si cambió, repetir verificación y QA. Preguntar al usuario solo si QA rechaza dos veces la misma tarea, si hace falta una decisión de diseño que el encargo no cubre, si algo no cuadra o antes de una acción hacia fuera (push, publicación).
 - Nunca canalizar `git rebase`, `git merge` ni `git commit` (`| tail`, `| grep`): el código de salida se pierde y el flujo sigue sobre una operación a medias. Comprobar siempre el código de salida y `git status` antes de lanzar el siguiente paso.
 - Con conflictos, los resuelve Claude, nunca un agente. La puerta de permisos deniega a todos los roles comandos de git que modifiquen el índice, historial o ramas.
 - El rol (`--role`) limita qué archivos puede editar el agente: `docs` solo documentación, `qa` solo veredicto y `artifacts/` (las mutaciones, sobre copias en `artifacts/qa-mutantes/`), `vision` y `research` solo `artifacts/`. El lanzador lo pasa en `AGY_ROLE` y el gate registra rol y decisión en `gate.log`.
