@@ -452,5 +452,44 @@ test('constructor como rol en relevo.config.json funciona', () => {
   fs.rmSync(tempRepo, { recursive: true, force: true });
 });
 
+test('Start-Process y sus alias se deniegan; npm start y nombres parecidos no', () => {
+  for (const command of [
+    'Start-Process git -ArgumentList push',
+    'Start-Process -FilePath git -ArgumentList "push","origin"',
+    'saps git push',
+    'start git push',
+    'cmd /c start git push',
+    'powershell -c "Start-Process git push"',
+    'Start-Process -FilePath notepad.exe',
+    "Start-Process npm.cmd -ArgumentList 'run','dev'",
+    'START-PROCESS git push',
+    'Get-Date; Start-Process git push',
+    'cmd.exe /c "start /b git push"',
+    'powershell -Command start git push',
+    '(Start-Process git -PassThru)',
+    // Añadidos por el auditor: el alias start lanzando algo que ninguna otra regla deniega.
+    'start notepad.exe',
+    'cmd /c start calc.exe',
+  ]) {
+    assert.equal(run(command), 'deny', command);
+  }
+  for (const command of [
+    // Añadidos por el auditor: start como argumento seguido de más argumentos no es el alias.
+    'npm start -- --port 3000',
+    'npm run start -- --host 127.0.0.1',
+    'npm start',
+    'npm run start',
+    'npm.cmd start',
+    'git log --grep start',
+    'Get-Content start.md',
+    'Restart-Service x',
+    'node scripts/start-server.cjs',
+    'Select-String -Path src -Pattern "Start-Processing"',
+    'echo restart',
+  ]) {
+    assert.notEqual(run(command), 'deny', command);
+  }
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
