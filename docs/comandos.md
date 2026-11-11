@@ -41,7 +41,7 @@ Se ejecuta siempre desde la raíz del repositorio principal, nunca desde un work
 
 ## `watch`
 
-Tarjetas por agente con proveedor, rol, modelo, duración, tokens y desglose de acciones (lecturas, búsquedas, ediciones, comandos, esperas). Teclado: `↑`/`↓` selecciona, `Enter` abre el registro paso a paso, `Esc` vuelve, `q` sale. Sin interacción: `watch --list` (tabla de ejecuciones) o `watch <NN> --once` (detalle de una).
+Tarjetas por agente con proveedor, rol, modelo, duración, tokens y desglose de acciones (lecturas, búsquedas, ediciones, comandos, esperas). Teclado: `↑`/`↓` selecciona, `Enter` abre el registro paso a paso, `Esc` vuelve, `q` sale. Sin interacción: `watch --list` (tabla de ejecuciones) o `watch <NN> --once` (detalle de una). Una ejecución cuyo agente y cuyo lanzador ya no viven, sin final registrado (por ejemplo, porque se mató el lanzador), aparece como «⊘ interrumpida», con la duración congelada; el lanzador guarda su PID en `meta.json` (`launcherPid`) para distinguirlo.
 
 ## `quota`
 

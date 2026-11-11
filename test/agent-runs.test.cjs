@@ -122,6 +122,53 @@ test('only launcher folders (NN-name with meta.json) are discovered as runs', ()
   assert.match(source, /meta\.json/);
 });
 
+const dead = require('node:child_process').spawnSync(process.execPath, ['-e', '0']).pid;
+function createRun(meta) {
+  const dir = fs.mkdtempSync(path.join(tmp, 'run-'));
+  const eventsFile = path.join(dir, 'events.ndjson');
+  fs.writeFileSync(eventsFile, '');
+  const metaFile = path.join(dir, 'meta.json');
+  fs.writeFileSync(metaFile, JSON.stringify(meta));
+  return new Run({ id: dir, name: path.basename(dir), eventsFile, metaFile });
+}
+
+test('(h) meta con pid y launcherPid muertos sin endedAt pasa a interrupted tras poll', () => {
+  const run = createRun({ pid: dead, launcherPid: dead });
+  run.poll();
+  assert.equal(run.status, 'interrupted');
+  assert.match(run.response, /Interrumpida/);
+});
+
+test('(i) meta con pid muerto y launcherPid vivo sigue running tras poll', () => {
+  const run = createRun({ pid: dead, launcherPid: process.pid });
+  run.poll();
+  assert.equal(run.status, 'running');
+});
+
+test('(j) meta con pid vivo y launcherPid muerto sigue running tras poll', () => {
+  const run = createRun({ pid: process.pid, launcherPid: dead });
+  run.poll();
+  assert.equal(run.status, 'running');
+});
+
+test('(k) meta con pid y launcherPid muertos pero endedAt presente y exitCode 0 pasa a ok', () => {
+  const run = createRun({ pid: dead, launcherPid: dead, endedAt: new Date().toISOString(), exitCode: 0 });
+  run.poll();
+  assert.equal(run.status, 'ok');
+});
+
+test('(l) formato antiguo sin launcherPid con pid muerto sin endedAt pasa a interrupted tras poll', () => {
+  const run = createRun({ pid: dead });
+  run.poll();
+  assert.equal(run.status, 'interrupted');
+});
+
+test('(m) meta sin pid y sin endedAt sigue running tras poll', () => {
+  const run = createRun({});
+  run.poll();
+  assert.equal(run.status, 'running');
+});
+
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\nagent runs: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
