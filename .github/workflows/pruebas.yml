@@ -1,0 +1,35 @@
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    name: ${{ matrix.os }} · Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22.12.0', '24.x']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # Las pruebas crean repositorios git temporales y hacen commits en ellos.
+      - name: Identidad de git para las pruebas
+        run: |
+          git config --global user.name "relevo CI"
+          git config --global user.email "ci@relevo.invalid"
+          git config --global init.defaultBranch main
+
+      - name: npm test
+        run: npm test
