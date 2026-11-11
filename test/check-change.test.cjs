@@ -426,6 +426,88 @@ test('check en un worktree ignora la entrada node_modules que no cubre el .gitig
   assert.ok(out4.includes('No hay cambios respecto a la base'), out4);
 });
 
+test('check en un worktree detecta cambios en node_modules con seguimiento (nm-rastreado)', () => {
+  const repo = path.resolve(tmpDir, 'repo-nm-rastreado');
+  fs.mkdirSync(repo, { recursive: true });
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+  execFileSync('git', ['config', 'user.email', 'test@relevo.local'], { cwd: repo });
+  execFileSync('git', ['config', 'user.name', 'Relevo Test'], { cwd: repo });
+  execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: repo });
+
+  fs.writeFileSync(path.join(repo, '.gitignore'), '');
+  fs.writeFileSync(path.join(repo, 'relevo.config.json'), JSON.stringify({ check: { sourcePattern: '^lib/' } }, null, 2) + '\n');
+  fs.mkdirSync(path.join(repo, 'lib'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'lib', 'base.cjs'), "'use strict';\n");
+  fs.writeFileSync(path.join(repo, 'node_modules'), 'tracked\n');
+
+  execFileSync('git', ['add', '-A'], { cwd: repo });
+  execFileSync('git', ['commit', '-q', '-m', 'inicial'], { cwd: repo });
+
+  execFileSync('git', ['worktree', 'add', '-q', '.worktrees/t', '-b', 't'], { cwd: repo });
+  const wt = path.resolve(repo, '.worktrees', 't');
+
+  fs.mkdirSync(path.join(wt, 'lib'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'test'), { recursive: true });
+  fs.writeFileSync(path.join(wt, 'lib', 'a.cjs'), "'use strict';\nmodule.exports = 1;\n");
+  fs.writeFileSync(path.join(wt, 'test', 'a.test.cjs'), "'use strict';\n");
+  execFileSync('git', ['add', '-A'], { cwd: wt });
+  execFileSync('git', ['commit', '-q', '-m', 'cambio'], { cwd: wt });
+
+  fs.writeFileSync(path.join(wt, 'node_modules'), 'tracked modificado preparado\n');
+  execFileSync('git', ['add', 'node_modules'], { cwd: wt });
+
+  const res1 = spawnSync(process.execPath, [path.join(__dirname, '..', 'bin', 'relevo.cjs'), 'check', '--sin-qa', 'x'], { cwd: wt, encoding: 'utf8' });
+  const out1 = (res1.stdout || '') + (res1.stderr || '');
+  assert.notEqual(res1.status, 0, out1);
+  assert.ok(out1.includes('cambios sin commit'), out1);
+  assert.ok(out1.includes('node_modules'), out1);
+
+  execFileSync('git', ['checkout', 'HEAD', '--', 'node_modules'], { cwd: wt });
+  fs.writeFileSync(path.join(wt, 'node_modules'), 'tracked modificado no preparado\n');
+
+  const res2 = spawnSync(process.execPath, [path.join(__dirname, '..', 'bin', 'relevo.cjs'), 'check', '--sin-qa', 'x'], { cwd: wt, encoding: 'utf8' });
+  const out2 = (res2.stdout || '') + (res2.stderr || '');
+  assert.notEqual(res2.status, 0, out2);
+  assert.ok(out2.includes('cambios sin commit'), out2);
+  assert.ok(out2.includes('node_modules'), out2);
+});
+
+test('check en un worktree conserva el nombre completo del archivo modificado sin preparar (nombre-completo)', () => {
+  const repo = path.resolve(tmpDir, 'repo-nombre-completo');
+  fs.mkdirSync(repo, { recursive: true });
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+  execFileSync('git', ['config', 'user.email', 'test@relevo.local'], { cwd: repo });
+  execFileSync('git', ['config', 'user.name', 'Relevo Test'], { cwd: repo });
+  execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: repo });
+
+  fs.writeFileSync(path.join(repo, '.gitignore'), '.qa-verdict.json\n.worktrees/\n');
+  fs.writeFileSync(path.join(repo, 'relevo.config.json'), JSON.stringify({ check: { sourcePattern: '^lib/' } }, null, 2) + '\n');
+  fs.mkdirSync(path.join(repo, 'lib'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'lib', 'base.cjs'), "'use strict';\n");
+
+  execFileSync('git', ['add', '-A'], { cwd: repo });
+  execFileSync('git', ['commit', '-q', '-m', 'inicial'], { cwd: repo });
+
+  execFileSync('git', ['worktree', 'add', '-q', '.worktrees/t', '-b', 't'], { cwd: repo });
+  const wt = path.resolve(repo, '.worktrees', 't');
+
+  fs.mkdirSync(path.join(wt, 'lib'), { recursive: true });
+  fs.mkdirSync(path.join(wt, 'test'), { recursive: true });
+  fs.writeFileSync(path.join(wt, 'lib', 'a.cjs'), "'use strict';\nmodule.exports = 1;\n");
+  fs.writeFileSync(path.join(wt, 'test', 'a.test.cjs'), "'use strict';\n");
+  execFileSync('git', ['add', '-A'], { cwd: wt });
+  execFileSync('git', ['commit', '-q', '-m', 'cambio valido'], { cwd: wt });
+
+  fs.writeFileSync(path.join(wt, 'lib', 'base.cjs'), "'use strict';\n// modificado sin preparar\n");
+
+  const res = spawnSync(process.execPath, [path.join(__dirname, '..', 'bin', 'relevo.cjs'), 'check', '--sin-qa', 'x'], { cwd: wt, encoding: 'utf8' });
+  const out = (res.stdout || '') + (res.stderr || '');
+  assert.notEqual(res.status, 0, out);
+  assert.ok(out.includes('cambios sin commit'), out);
+  assert.ok(out.includes('lib/base.cjs'), out);
+  assert.ok(!out.includes('(ib/base.cjs)'), out);
+});
+
 try {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 } catch { /* ignorar */ }
