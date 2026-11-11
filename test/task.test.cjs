@@ -664,6 +664,70 @@ test('(y) taskIntegrate con noQaReason pasa --sin-qa a check: sin motivo falla, 
   assert.equal(fs.existsSync(wtDir), false);
 });
 
+test('(aa) con testCommand que pasa, stdout no contiene ruido de pruebas, contiene pruebas: ok y salida es 0', () => {
+  const repo = makeGitRepo(tmpBase);
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules/\n');
+  fs.writeFileSync(
+    path.join(repo, 'relevo.config.json'),
+    JSON.stringify({ check: { testCommand: ['node', '-e', "console.log('RUIDO-PRUEBAS')"] } }, null, 2) + '\n'
+  );
+  execFileSync('git', ['add', '.gitignore', 'relevo.config.json'], { cwd: repo });
+  execFileSync('git', ['commit', '-m', 'config y gitignore', '-q'], { cwd: repo });
+
+  taskNew({ name: 'feat-aa', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'feat-aa');
+  fs.writeFileSync(path.join(wtDir, 'a.txt'), 'contenido a\n');
+  execFileSync('git', ['add', 'a.txt'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'commit a', '-q'], { cwd: wtDir });
+
+  const res = spawnSync(
+    process.execPath,
+    [path.resolve(__dirname, '../bin/relevo.cjs'), 'task', 'integrate', 'feat-aa'],
+    { cwd: repo, encoding: 'utf8' }
+  );
+
+  const stdoutWithoutOkLine = res.stdout
+    .split(/\r?\n/)
+    .filter((line) => !line.includes('pruebas: ok'))
+    .join('\n');
+  assert.equal(stdoutWithoutOkLine.includes('RUIDO-PRUEBAS'), false);
+  const lines = res.stdout.split(/\r?\n/).map((l) => l.trim());
+  assert.equal(lines.includes('RUIDO-PRUEBAS'), false);
+  assert.ok(res.stdout.includes('pruebas: ok'));
+  assert.equal(res.status, 0);
+});
+
+test('(ab) con testCommand que falla, salida !== 0, stderr contiene Las pruebas fallan y RUIDO-FALLO, y main no cambió', () => {
+  const repo = makeGitRepo(tmpBase);
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules/\n');
+  fs.writeFileSync(
+    path.join(repo, 'relevo.config.json'),
+    JSON.stringify({ check: { testCommand: ['node', '-e', "console.log('RUIDO-FALLO'); process.exit(1)"] } }, null, 2) + '\n'
+  );
+  execFileSync('git', ['add', '.gitignore', 'relevo.config.json'], { cwd: repo });
+  execFileSync('git', ['commit', '-m', 'config y gitignore', '-q'], { cwd: repo });
+
+  const mainBefore = execFileSync('git', ['rev-parse', 'main'], { cwd: repo, encoding: 'utf8' }).trim();
+
+  taskNew({ name: 'feat-ab', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'feat-ab');
+  fs.writeFileSync(path.join(wtDir, 'a.txt'), 'contenido a\n');
+  execFileSync('git', ['add', 'a.txt'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'commit a', '-q'], { cwd: wtDir });
+
+  const res = spawnSync(
+    process.execPath,
+    [path.resolve(__dirname, '../bin/relevo.cjs'), 'task', 'integrate', 'feat-ab'],
+    { cwd: repo, encoding: 'utf8' }
+  );
+
+  assert.notEqual(res.status, 0);
+  assert.ok(res.stderr.includes('Las pruebas fallan'));
+  assert.ok(res.stderr.includes('RUIDO-FALLO'));
+  const mainAfter = execFileSync('git', ['rev-parse', 'main'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(mainAfter, mainBefore);
+});
+
 // Limpieza general
 try {
   fs.rmSync(tmpBase, { recursive: true, force: true });
