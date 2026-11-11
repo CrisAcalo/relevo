@@ -47,7 +47,7 @@ No ejecuta suites: comprueba que el ciclo se cumplió.
 
 | Regla | Qué protege | Origen |
 |---|---|---|
-| Rechaza flags `dangerously`, `bypass` o `skip-permissions` | Desactivar permisos o sandbox del proveedor | Incidente I-02 |
+| Rechaza opciones cuyo nombre contenga `dangerously`, `bypass` o `skip-permissions` (solo nombres de opción, no valores ni rutas), y en Codex un `--sandbox` distinto de `read-only` o `workspace-write` | Desactivar permisos o sandbox del proveedor | Incidente I-02 |
 | Raíz del repositorio principal calculada con git; `--cwd` debe existir y estar dentro | Rutas mal resueltas y registros perdidos al borrar un worktree | Incidentes I-20 y R-01 |
 | Consulta el cupo y rechaza por debajo de `quota.min` (15 %) salvo `--allow-low-quota`; avisa por debajo de `quota.warn` (30 %) | Agentes que se quedan a medias sin cupo | Incidente I-22 |
 | Guarda encargo, metadatos, eventos y errores en `runsDir/<NN>-<tarea>/` | Poder auditar y repetir cualquier ejecución | Preventiva; el panel solo cuenta esas carpetas (I-18) |
