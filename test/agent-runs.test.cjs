@@ -110,7 +110,9 @@ test('a run that exits without a result event is closed from meta.json', () => {
 test('launcher command builders never add permission bypass flags', () => {
   const agy = PROVIDERS.agy.command({ prompt: 'p', model: 'gemini-3.8-flash-high', mode: 'plan', timeoutSeconds: 60 });
   assert.equal(agy.command, 'agy');
-  assert.deepEqual(agy.args.slice(0, 2), ['-p', 'p']);
+  assert.equal(agy.args[agy.args.length - 1], '-p=');
+  assert.ok(!agy.args.includes('p'));
+  assert.deepEqual(JSON.parse(agy.input), { event: 'user', message: { content: 'p' } });
   assert.ok(agy.args.includes('stream-json'));
   const codex = PROVIDERS.codex.command({ prompt: 'p', model: 'm', cwd: 'C:/repo' });
   assert.deepEqual(codex.args.slice(0, 4), ['exec', '--json', '-s', 'workspace-write']);
@@ -203,6 +205,26 @@ test('(q) discoverRuns no lista las carpetas .reserva-NN', () => {
   assert.equal(runsPattern.test('.reserva-01'), false);
   assert.equal(runsPattern.test('.reserva-07'), false);
   assert.equal(runsPattern.test('.reserva-99'), false);
+});
+
+test('(r) encargo de 100 000 caracteres viaja por input sin inflar args', () => {
+  const prompt = 'x'.repeat(100000);
+  const { args, input } = PROVIDERS.agy.command({ prompt, model: 'm', timeoutSeconds: 60 });
+  assert.ok(args.join(' ').length < 300);
+  assert.ok(input.endsWith('\n'));
+  assert.equal(JSON.parse(input).message.content.length, 100000);
+});
+
+test('(s) args contiene --input-format stream-json y -p= tras --model', () => {
+  const { args } = PROVIDERS.agy.command({ prompt: 'p', model: 'm', timeoutSeconds: 60 });
+  const inputFormatIndex = args.indexOf('--input-format');
+  assert.ok(inputFormatIndex !== -1);
+  assert.equal(args[inputFormatIndex + 1], 'stream-json');
+  const modelIndex = args.indexOf('--model');
+  const pIndex = args.indexOf('-p=');
+  assert.ok(modelIndex !== -1);
+  assert.ok(pIndex !== -1);
+  assert.ok(pIndex > modelIndex);
 });
 
 async function testAsync(name, action) {

@@ -38,7 +38,7 @@ relevo run --provider agy --role coder --model gemini-3.8-flash-high \
 | `--sandbox` | Modo de sandbox de Codex (por defecto `workspace-write`). |
 | `--allow-low-quota` | Lanza aunque el cupo esté por debajo de `quota.min`; exige justificarlo. |
 
-Se ejecuta siempre desde la raíz del repositorio principal, nunca desde un worktree. Cada ejecución guarda en `<runsDir>/<NN>-<tarea>/` el encargo (`brief.md`), los metadatos (`meta.json`, con el cupo antes y después), los eventos del CLI (`events.ndjson`) y `stderr.log`.
+Se ejecuta siempre desde la raíz del repositorio principal, nunca desde un worktree. Cada ejecución guarda en `<runsDir>/<NN>-<tarea>/` el encargo (`brief.md`), los metadatos (`meta.json`, con el cupo antes y después), los eventos del CLI (`events.ndjson`) y `stderr.log`. Con agy, el encargo viaja por stdin (`--input-format stream-json`), así que su longitud no depende del límite de la línea de comandos de Windows.
 
 ## `watch`
 
