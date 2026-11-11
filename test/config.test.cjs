@@ -229,6 +229,18 @@ test('el ámbito por defecto de qa es solo veredicto y artefactos', () => {
   assert.deepEqual([...DEFAULTS.gate.roleScopes.qa], ['^\\.qa-verdict\\.json$', '^artifacts/']);
 });
 
+test('check.testCommand acepta null y ["npm", "test"], y rechaza [], "npm test" y [""]', () => {
+  assert.doesNotThrow(() => validateConfig({ ...DEFAULTS, check: { ...DEFAULTS.check, testCommand: null } }));
+  assert.doesNotThrow(() => validateConfig({ ...DEFAULTS, check: { ...DEFAULTS.check, testCommand: ['npm', 'test'] } }));
+
+  for (const invalid of [[], 'npm test', ['']]) {
+    assert.throws(
+      () => validateConfig({ ...DEFAULTS, check: { ...DEFAULTS.check, testCommand: invalid } }),
+      /relevo\.config\.json: check\.testCommand debe ser null o una lista de textos \(programa y argumentos\)/
+    );
+  }
+});
+
 // Limpieza
 try {
   fs.rmSync(tmpBase, { recursive: true, force: true });

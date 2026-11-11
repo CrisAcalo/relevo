@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
-const { evaluate } = require('../lib/check-change.cjs');
+const { evaluate, samePatch } = require('../lib/check-change.cjs');
 
 const failures = [];
 let passed = 0;
@@ -297,6 +297,77 @@ test('check en un worktree sigue fallando sin veredicto en el worktree', () => {
   const { status, output } = runCheck(wt);
   assert.equal(status, 1, output);
   assert.ok(output.includes('Falta .qa-verdict.json'), output);
+});
+
+test('(evaluate) con un veredicto aprobado de otro commit: verdictSamePatch: true no da fallo y deja nota; false da fallo', () => {
+  const otherCommit = 'b'.repeat(40);
+  const verdictOther = { ...approved, commit: otherCommit };
+  const changed = ['src/a.ts', 'scripts/test-a.cjs', 'docs/publishing-roadmap.md'];
+
+  const okRes = evaluate({ ...base, changed, verdict: verdictOther, verdictSamePatch: true });
+  assert.ok(!okRes.failures.some((f) => /no del actual/.test(f)));
+  assert.ok(okRes.notes.some((n) => n.includes(`El veredicto es del commit ${otherCommit.slice(0, 8)}, con el mismo parche que el actual (rebase sin cambios): vale.`)));
+
+  const failRes = evaluate({ ...base, changed, verdict: verdictOther, verdictSamePatch: false });
+  assert.ok(failRes.failures.some((f) => /no del actual/.test(f)));
+});
+
+test('(evaluate) sin veredicto y con código fuente cambiado: noQaReason no da Falta y deja nota', () => {
+  const changed = ['src/a.ts', 'scripts/test-a.cjs', 'docs/publishing-roadmap.md'];
+  const res = evaluate({ ...base, changed, verdict: null, noQaReason: 'cambio trivial' });
+  assert.ok(!res.failures.some((f) => f.includes('Falta')));
+  assert.ok(res.notes.some((n) => n.includes('Sin QA, justificado: cambio trivial')));
+});
+
+test('(samePatch) compara parches tras rebase, enmienda y hash inexistente', () => {
+  const repo = fs.mkdtempSync(path.join(tmpDir, 'same-patch-'));
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+  execFileSync('git', ['config', 'user.email', 'test@relevo.local'], { cwd: repo });
+  execFileSync('git', ['config', 'user.name', 'Relevo Test'], { cwd: repo });
+  execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: repo });
+
+  fs.writeFileSync(path.join(repo, 'base.txt'), 'base\n');
+  execFileSync('git', ['add', 'base.txt'], { cwd: repo });
+  execFileSync('git', ['commit', '-q', '-m', 'base'], { cwd: repo });
+
+  execFileSync('git', ['checkout', '-q', '-b', 'feat'], { cwd: repo });
+  fs.writeFileSync(path.join(repo, 'feat.txt'), 'feature\n');
+  execFileSync('git', ['add', 'feat.txt'], { cwd: repo });
+  execFileSync('git', ['commit', '-q', '-m', 'feat'], { cwd: repo });
+  const oldCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+
+  execFileSync('git', ['checkout', '-q', 'main'], { cwd: repo });
+  fs.writeFileSync(path.join(repo, 'main.txt'), 'main avanzó\n');
+  execFileSync('git', ['add', 'main.txt'], { cwd: repo });
+  execFileSync('git', ['commit', '-q', '-m', 'main avanzó'], { cwd: repo });
+
+  execFileSync('git', ['checkout', '-q', 'feat'], { cwd: repo });
+  execFileSync('git', ['rebase', 'main'], { cwd: repo });
+  const rebasedCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+
+  assert.notEqual(oldCommit, rebasedCommit);
+  const prevCwd = process.cwd();
+  process.chdir(repo);
+  try {
+    assert.equal(samePatch(oldCommit, rebasedCommit, 'main', repo), true);
+    assert.equal(samePatch(oldCommit, rebasedCommit, 'main'), true);
+
+    // Si se enmienda con otro contenido
+    fs.writeFileSync(path.join(repo, 'feat.txt'), 'feature modificado\n');
+    execFileSync('git', ['add', 'feat.txt'], { cwd: repo });
+    execFileSync('git', ['commit', '--amend', '-q', '--no-edit'], { cwd: repo });
+    const amendedCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+
+    assert.equal(samePatch(oldCommit, amendedCommit, 'main', repo), false);
+
+    // Hash inexistente
+    assert.equal(samePatch('0'.repeat(40), rebasedCommit, 'main', repo), false);
+
+    // Añadido por el auditor: dos parches vacíos (sin cambios respecto a la base) no cuentan como el mismo parche.
+    assert.equal(samePatch('main', 'main', 'main', repo), false);
+  } finally {
+    process.chdir(prevCwd);
+  }
 });
 
 try {

@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
-const { taskNew, taskDone, taskList } = require('../lib/task.cjs');
+const { taskNew, taskDone, taskList, taskIntegrate } = require('../lib/task.cjs');
 
 const failures = [];
 let passed = 0;
@@ -482,6 +482,186 @@ test('(r) carpeta desregistrada con solo el enlace node_modules → task done qu
   const centinelaRoot = path.join(repo, 'node_modules', 'centinela.txt');
   assert.ok(fs.existsSync(centinelaRoot));
   assert.equal(fs.readFileSync(centinelaRoot, 'utf8'), 'centinela-ok\n');
+});
+
+test('(s) tarea con un commit y base sin avanzar → taskIntegrate hace fast-forward, main contiene el commit, carpeta y rama no existen y rebased === false', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'feat-s', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'feat-s');
+  fs.writeFileSync(path.join(wtDir, 'archivo-s.txt'), 'contenido s\n');
+  execFileSync('git', ['add', 'archivo-s.txt'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'commit s', '-q'], { cwd: wtDir });
+  const commitHash = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: wtDir, encoding: 'utf8' }).trim();
+
+  const res = taskIntegrate({ name: 'feat-s', cwd: repo, silent: true, runTests: false });
+  assert.equal(res.rebased, false);
+  assert.equal(res.name, 'feat-s');
+  assert.equal(res.branch, 'relevo/feat-s');
+
+  const mainHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(mainHead, commitHash);
+  assert.ok(fs.existsSync(path.join(repo, 'archivo-s.txt')));
+
+  assert.equal(fs.existsSync(wtDir), false);
+  const branchOut = execFileSync('git', ['branch', '--list', 'relevo/feat-s'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(branchOut, '');
+});
+
+test('(t) tarea con un commit en un archivo y commit nuevo en main sobre otro archivo → taskIntegrate rebasa (rebased === true) e integra', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'feat-t', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'feat-t');
+  fs.writeFileSync(path.join(wtDir, 'archivo-t.txt'), 'contenido t\n');
+  execFileSync('git', ['add', 'archivo-t.txt'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'commit t', '-q'], { cwd: wtDir });
+
+  fs.writeFileSync(path.join(repo, 'otro.txt'), 'otro en main\n');
+  execFileSync('git', ['add', 'otro.txt'], { cwd: repo });
+  execFileSync('git', ['commit', '-m', 'commit en main', '-q'], { cwd: repo });
+
+  const res = taskIntegrate({ name: 'feat-t', cwd: repo, silent: true, runTests: false });
+  assert.equal(res.rebased, true);
+  assert.equal(res.name, 'feat-t');
+  assert.equal(res.branch, 'relevo/feat-t');
+
+  assert.ok(fs.existsSync(path.join(repo, 'archivo-t.txt')));
+  assert.ok(fs.existsSync(path.join(repo, 'otro.txt')));
+
+  assert.equal(fs.existsSync(wtDir), false);
+  const branchOut = execFileSync('git', ['branch', '--list', 'relevo/feat-t'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(branchOut, '');
+});
+
+test('(u) tarea y main modifican la misma línea del mismo archivo → taskIntegrate lanza /Conflictos al rebasar/, sin rebase en curso y main no cambió', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'feat-u', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'feat-u');
+
+  fs.writeFileSync(path.join(wtDir, 'README.md'), '# conflicto desde tarea\n');
+  execFileSync('git', ['add', 'README.md'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'conflicto en tarea', '-q'], { cwd: wtDir });
+
+  fs.writeFileSync(path.join(repo, 'README.md'), '# conflicto desde main\n');
+  execFileSync('git', ['add', 'README.md'], { cwd: repo });
+  execFileSync('git', ['commit', '-m', 'conflicto en main', '-q'], { cwd: repo });
+  const mainHeadBefore = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+
+  assert.throws(
+    () => taskIntegrate({ name: 'feat-u', cwd: repo, silent: true, runTests: false }),
+    /Conflictos al rebasar/
+  );
+
+  const wtGitDir = execFileSync('git', ['rev-parse', '--git-dir'], { cwd: wtDir, encoding: 'utf8' }).trim();
+  const absWtGitDir = path.resolve(wtDir, wtGitDir);
+  assert.equal(fs.existsSync(path.join(absWtGitDir, 'rebase-merge')), false);
+  assert.equal(fs.existsSync(path.join(absWtGitDir, 'rebase-apply')), false);
+
+  const mainHeadAfter = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(mainHeadAfter, mainHeadBefore);
+});
+
+test('(v) main con un cambio sin confirmar en un archivo con seguimiento → lanza /cambios sin confirmar/', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'feat-v', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'feat-v');
+  fs.writeFileSync(path.join(wtDir, 'v.txt'), 'v\n');
+  execFileSync('git', ['add', 'v.txt'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'v', '-q'], { cwd: wtDir });
+
+  fs.writeFileSync(path.join(repo, 'README.md'), '# modificado sin commit\n');
+
+  assert.throws(
+    () => taskIntegrate({ name: 'feat-v', cwd: repo, silent: true, runTests: false }),
+    /cambios sin confirmar/
+  );
+});
+
+// Añadida por el auditor: integrar desde otra rama del repositorio principal movería esa rama, no la base.
+test('(z) el repositorio principal en otra rama → lanza /Integra desde la rama main/ y no integra', () => {
+  const repo = makeGitRepo(tmpBase);
+  taskNew({ name: 'feat-z', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'feat-z');
+  fs.writeFileSync(path.join(wtDir, 'z.txt'), 'z\n');
+  execFileSync('git', ['add', 'z.txt'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'z', '-q'], { cwd: wtDir });
+  execFileSync('git', ['checkout', '-q', '-b', 'otra'], { cwd: repo });
+
+  assert.throws(
+    () => taskIntegrate({ name: 'feat-z', cwd: repo, silent: true, runTests: false }),
+    /Integra desde la rama main/
+  );
+  assert.equal(fs.existsSync(path.join(repo, 'z.txt')), false);
+  assert.ok(fs.existsSync(wtDir));
+});
+
+test('(w) runTests: true con relevo.config.json del repo de prueba con {"check":{"testCommand":["node","-e","process.exit(1)"]}} → lanza /Las pruebas fallan/ y main no cambió', () => {
+  const repo = makeGitRepo(tmpBase);
+  fs.writeFileSync(
+    path.join(repo, 'relevo.config.json'),
+    JSON.stringify({ check: { testCommand: ['node', '-e', 'process.exit(1)'] } }, null, 2) + '\n'
+  );
+  execFileSync('git', ['add', 'relevo.config.json'], { cwd: repo });
+  execFileSync('git', ['commit', '-m', 'config testCommand', '-q'], { cwd: repo });
+  const mainHeadBefore = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+
+  taskNew({ name: 'feat-w', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'feat-w');
+  fs.writeFileSync(path.join(wtDir, 'w.txt'), 'w\n');
+  execFileSync('git', ['add', 'w.txt'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'w', '-q'], { cwd: wtDir });
+
+  assert.throws(
+    () => taskIntegrate({ name: 'feat-w', cwd: repo, silent: true, runTests: true }),
+    /Las pruebas fallan/
+  );
+
+  const mainHeadAfter = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.equal(mainHeadAfter, mainHeadBefore);
+});
+
+test('(x) repo de prueba con sourcePattern "^README\\.md$" y commit que toca README.md sin veredicto → taskIntegrate lanza /relevo check no pasa/', () => {
+  const repo = makeGitRepo(tmpBase);
+  fs.writeFileSync(
+    path.join(repo, 'relevo.config.json'),
+    JSON.stringify({ check: { sourcePattern: '^README\\.md$' } }, null, 2) + '\n'
+  );
+  execFileSync('git', ['add', 'relevo.config.json'], { cwd: repo });
+  execFileSync('git', ['commit', '-m', 'config sourcePattern', '-q'], { cwd: repo });
+
+  taskNew({ name: 'feat-x', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'feat-x');
+  fs.writeFileSync(path.join(wtDir, 'README.md'), '# README modificado\n');
+  execFileSync('git', ['add', 'README.md'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'modifica README', '-q'], { cwd: wtDir });
+
+  assert.throws(
+    () => taskIntegrate({ name: 'feat-x', cwd: repo, silent: true, runTests: false }),
+    /relevo check no pasa/
+  );
+});
+
+// Añadida por el auditor: el ciclo ligero integra sin veredicto pasando --sin-qa a relevo check.
+test('(y) taskIntegrate con noQaReason pasa --sin-qa a check: sin motivo falla, con motivo integra', () => {
+  const repo = makeGitRepo(tmpBase);
+  fs.writeFileSync(path.join(repo, 'relevo.config.json'), JSON.stringify({ check: { sourcePattern: '^lib/' } }, null, 2) + '\n');
+  // Como en un proyecto real: sin esto, el enlace node_modules del worktree cuenta como cambio sin commit.
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules/\n');
+  execFileSync('git', ['add', 'relevo.config.json', '.gitignore'], { cwd: repo });
+  execFileSync('git', ['commit', '-m', 'config', '-q'], { cwd: repo });
+  taskNew({ name: 'ligera', cwd: repo, silent: true });
+  const wtDir = path.join(repo, '.worktrees', 'ligera');
+  fs.mkdirSync(path.join(wtDir, 'lib'));
+  fs.mkdirSync(path.join(wtDir, 'test'));
+  fs.writeFileSync(path.join(wtDir, 'lib', 'a.cjs'), "'use strict';\n");
+  fs.writeFileSync(path.join(wtDir, 'test', 'a.test.cjs'), "'use strict';\n");
+  execFileSync('git', ['add', 'lib/a.cjs', 'test/a.test.cjs'], { cwd: wtDir });
+  execFileSync('git', ['commit', '-m', 'cambio ligero', '-q'], { cwd: wtDir });
+
+  assert.throws(() => taskIntegrate({ name: 'ligera', cwd: repo, silent: true, runTests: false }), /relevo check no pasa/);
+  const result = taskIntegrate({ name: 'ligera', cwd: repo, silent: true, runTests: false, noQaReason: 'cambio trivial' });
+  assert.equal(result.rebased, false);
+  assert.ok(fs.existsSync(path.join(repo, 'lib', 'a.cjs')));
+  assert.equal(fs.existsSync(wtDir), false);
 });
 
 // Limpieza general

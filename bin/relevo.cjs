@@ -8,7 +8,7 @@
  *   relevo quota [--json]
  *   relevo check            (definición de hecho mecánica sobre la rama actual)
  *   relevo doctor [--json]  (comprueba entorno, configuración global del CLI e instalación)
- *   relevo task new <nombre> [--from <ref>] | task done <nombre> [--force] | task list
+ *   relevo task new <nombre> [--from <ref>] | task done <nombre> [--force] | task integrate <nombre> [--sin-qa "<motivo>"] [--sin-pruebas] | task list
  *   relevo update [--apply] (actualiza lo instalado sin pisar lo personalizado)
  */
 const path = require('node:path');

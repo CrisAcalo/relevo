@@ -3,6 +3,7 @@
     "sourcePattern": "^(lib|bin)/",
     "testPattern": "^test/[\\w./-]+$",
     "roadmap": null,
-    "decisions": { "dir": "docs/decisions", "index": "README.md" }
+    "decisions": { "dir": "docs/decisions", "index": "README.md" },
+    "testCommand": ["npm", "test"]
   }
 }
