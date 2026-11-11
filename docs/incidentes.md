@@ -62,7 +62,8 @@ Formato: síntoma observado → causa comprobada → regla resultante (dónde vi
 ### I-11 · Mutación sobre un archivo sin seguimiento (2026-11-09)
 - **Síntoma:** tras una prueba de mutación, `git checkout` no pudo restaurar el archivo mutado; se recuperó de una copia.
 - **Causa:** el archivo era nuevo (sin seguimiento en git): no hay versión a la que volver.
-- **Regla:** procedimiento seguro de mutación: copiar a `<archivo>.qa-bak`, mutar, ejecutar, restaurar **desde la copia**, comparar y confirmar con `git status`. (agente `qa`; `.qa-bak` en el ámbito de QA y en `.gitignore`)
+- **Regla:** QA nunca muta el código real: copia el archivo, sus pruebas y lo que necesiten a `artifacts/qa-mutantes/<tarea>/`, comprueba que las pruebas copiadas pasan sin mutar y cargan la copia, y muta solo la copia. El ámbito por defecto de `qa` es `.qa-verdict.json` y `artifacts/`; `artifacts/qa-mutantes/` está en `.gitignore`. (agente `qa`; `lib/permission-gate.cjs`)
+- **Antes (hasta 2026-11-10):** copia `<archivo>.qa-bak`, mutación del archivo real y restauración desde la copia; se retiró porque obligaba a dar a QA permiso de edición sobre `src/`, `scripts/` y `test/`.
 
 ### I-12 · QA aprobó con un hallazgo alto (A3, 2026-11-10)
 - **Síntoma:** el veredicto decía "aprobado" aunque una mutación del orden de la cadena no la detectaba ninguna prueba.

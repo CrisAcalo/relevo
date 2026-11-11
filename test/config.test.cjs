@@ -225,6 +225,10 @@ test('constructor como rol es una clave normal', () => {
   assert.deepEqual(config.gate.roleScopes.docs, DEFAULTS.gate.roleScopes.docs);
 });
 
+test('el ámbito por defecto de qa es solo veredicto y artefactos', () => {
+  assert.deepEqual([...DEFAULTS.gate.roleScopes.qa], ['^\\.qa-verdict\\.json$', '^artifacts/']);
+});
+
 // Limpieza
 try {
   fs.rmSync(tmpBase, { recursive: true, force: true });

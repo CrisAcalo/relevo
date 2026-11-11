@@ -17,7 +17,7 @@ El núcleo de este flujo fue extraído y formalizado en `relevo` como un kit reu
 - **Protocolo de delegación para modelos Flash**: 8 reglas obligatorias para formular encargos a modelos rápidos sin dejar margen a ambigüedades o suposiciones en tareas delicadas.
 - **Roles especializados**:
   - `documentalista`: actualiza la hoja de ruta, las decisiones de arquitectura y el índice documental sobre el diff real antes de QA.
-  - `qa`: agente independiente que ejecuta las pruebas del área en navegadores aislados headless, verifica tautologías, audita capturas y realiza pruebas de mutación obligatorias (`.qa-bak`), emitiendo `.qa-verdict.json` sin tocar código.
+  - `qa`: agente independiente que ejecuta las pruebas del área en navegadores aislados headless, verifica tautologías, audita capturas y realiza pruebas de mutación obligatorias (sobre copias en `artifacts/qa-mutantes/`), emitiendo `.qa-verdict.json` sin tocar código.
 - **Control mecánico de la definición de hecho (`relevo check`)**: validación automática del veredicto de QA atado al commit actual, rechazo de veredictos con hallazgos altos, exigencia de pruebas unitarias al tocar código y verificación de documentación y ausencia de colores fijos en UI.
 - **Plantillas de skills y agentes**: plantillas de skills (`delegar-agy`, `auditar-capturas`, `e2e-headless`, `definicion-de-hecho`, `verificar-cambio`) y agentes (`qa`, `documentalista`) preparadas para instalarse en cualquier proyecto mediante marcadores estándar `<<PROYECTO: …>>`.
 

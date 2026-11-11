@@ -12,7 +12,7 @@
 | `.agents/hooks/permission-gate.cjs`, `.agents/hooks.json` | Puerta de permisos (hook `PreToolUse` de agy). |
 | `.agents/skills.json` | Registro de las skills para agy. |
 | `.agents/relevo.lock.json` | Hash de cada plantilla instalada; es la base de `relevo update`. |
-| `.gitignore` | `artifacts/agent-runs/`, `.worktrees/`, `.agents/hooks/gate.log`, `.qa-verdict.json`, `*.qa-bak`, `*.relevo-new`. |
+| `.gitignore` | `artifacts/agent-runs/`, `.worktrees/`, `.agents/hooks/gate.log`, `.qa-verdict.json`, `artifacts/qa-mutantes/`, `*.relevo-new`. |
 
 Después de instalar:
 
@@ -51,11 +51,11 @@ Una clave desconocida o un valor de tipo incorrecto es un error. La clave `__pro
 |---|---|
 | `coder` | Sin restricción de rutas. |
 | `docs` | `docs/`, `AGENTS.md`, `CONTRIBUTING.md`, `README.md`. |
-| `qa` | `.qa-verdict.json`, `artifacts/`, `*.qa-bak` y, para las mutaciones temporales, `src/`, `scripts/` y `test/`. |
+| `qa` | `.qa-verdict.json` y `artifacts/` (las mutaciones se hacen sobre copias en `artifacts/qa-mutantes/`; nunca `src/`, `scripts/` ni `test/`). |
 | `review` | `artifacts/` y `.qa-verdict.json`. |
 | `vision`, `research` | `artifacts/`. |
 
-Para ampliar el ámbito de un rol, define solo ese rol; los demás conservan sus valores por defecto. Por ejemplo, `{"gate":{"roleScopes":{"qa":["^\\.qa-verdict\\.json$","^artifacts/","\\.qa-bak$","^lib/","^test/"]}}}` cambia solo `qa`. La lista sustituye a la de ese rol (no se suma), así que repite las rutas por defecto que quieras mantener. `{"qa": null}` deja a `qa` sin restricción.
+Para ampliar el ámbito de un rol, define solo ese rol; los demás conservan sus valores por defecto. Por ejemplo, `{"gate":{"roleScopes":{"docs":["^docs/","^AGENTS\\.md$","^CONTRIBUTING\\.md$","^README\\.md$","^CHANGELOG\\.md$"]}}}` cambia solo `docs`. La lista sustituye a la de ese rol (no se suma), así que repite las rutas por defecto que quieras mantener. `{"docs": null}` deja a `docs` sin restricción. Ampliar `qa` a código va contra su papel: sus mutaciones se hacen sobre copias en `artifacts/qa-mutantes/`.
 
 ### Ejemplo
 

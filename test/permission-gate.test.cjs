@@ -82,9 +82,16 @@ test('edits are scoped by role passed in AGY_ROLE', () => {
   assert.equal(edit('docs', root + 'README.md'), 'allow');
   assert.equal(edit('docs', root + 'package.json'), 'deny');
   assert.equal(edit('docs', root + 'src/App.svelte', 'write_to_file'), 'deny');
-  // QA: veredicto, artefactos y mutaciones temporales; nunca package.json ni docs
+  // QA: solo veredicto y artefactos (mutantes en artifacts/qa-mutantes); nunca código, pruebas, package.json ni docs
   assert.equal(edit('qa', root + '.qa-verdict.json', 'write_to_file'), 'allow');
-  assert.equal(edit('qa', root + 'src/audio/PcmWav.ts.qa-bak', 'write_to_file'), 'allow');
+  assert.equal(edit('qa', root + 'src/x.ts'), 'deny');
+  assert.equal(edit('qa', root + 'src/x.ts', 'write_to_file'), 'deny');
+  assert.equal(edit('qa', root + 'src/audio/PcmWav.ts.qa-bak', 'write_to_file'), 'deny');
+  assert.equal(edit('qa', root + 'scripts/build.cjs'), 'deny');
+  assert.equal(edit('qa', root + 'test/x.test.cjs'), 'deny');
+  assert.equal(edit('qa', root + 'lib/x.cjs'), 'deny');
+  assert.equal(edit('qa', root + 'artifacts/qa-mutantes/x', 'write_to_file'), 'allow');
+  assert.equal(edit('qa', root + 'artifacts/qa-mutantes/demo/src/x.ts'), 'allow');
   assert.equal(edit('qa', root + 'package.json'), 'deny');
   assert.equal(edit('qa', root + 'docs/publishing-roadmap.md'), 'deny');
   // capturas/investigación: solo artefactos
@@ -264,8 +271,8 @@ test('la forma canónica no deniega lectura ni verificación', () => {
     assert.equal(run(command), 'allow', command);
   }
   for (const command of [
-    'git -C . status', 'Copy-Item src/a.ts src/a.ts.qa-bak', 'Move-Item src/a.ts.qa-bak src/a.ts -Force',
-    'Remove-Item src/a.ts.qa-bak', 'echo digit -C x', 'Select-String -Path src -Pattern config',
+    'git -C . status', 'Copy-Item src/a.ts artifacts/qa-mutantes/t/src/a.ts', 'Copy-Item -Recurse src artifacts/qa-mutantes/t/src',
+    'Remove-Item artifacts/qa-mutantes/t/src/a.ts', 'echo digit -C x', 'Select-String -Path src -Pattern config',
     'npm --version',
     'git branch nueva', 'git branch --merged main', 'npm run release -- --dry-run',
   ]) {

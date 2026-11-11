@@ -42,7 +42,7 @@ El origen de cada regla de este flujo, de la puerta de permisos, de `relevo chec
   3. **Auditoría inicial de Claude**: revisión de archivos tocados, ejecución independiente de pruebas y barrido propio.
   4. **Documentalista**: agente en rol `docs` actualiza la documentación (`docs/**`, índice, hoja de ruta) a partir del diff real antes de QA.
   5. **Commit de Claude**: commit de los cambios de código y documentación en la rama.
-  6. **QA independiente**: agente en rol `qa` ejecuta pruebas generales y del área en headless, realiza pruebas de mutación obligatorias (`.qa-bak`) y emite `.qa-verdict.json` sin tocar código.
+  6. **QA independiente**: agente en rol `qa` ejecuta pruebas generales y del área en headless, realiza pruebas de mutación obligatorias (sobre copias en `artifacts/qa-mutantes/`) y emite `.qa-verdict.json` sin tocar código.
   7. **Auditoría final de Claude**: revisión de veredicto, mutaciones e informe.
   8. **Control mecánico**: `relevo check` (o `npm run check:change`) valida mecánicamente 11 reglas probadas:
      - Detección de cambios respecto a la base.

@@ -95,7 +95,7 @@ Delicado = persistencia/migraciones, concurrencia, render/exportación/determini
 - **Integración autónoma**: cuando el ciclo se cumple (auditoría propia con mutaciones, veredicto de QA aprobado sobre el commit exacto que se integra, `relevo check` y pruebas en verde), Claude integra en la rama principal y cierra la tarea con `relevo task done` sin pedir aprobación. Tras un rebase, el veredicto deja de valer: repetir verificación y QA sobre el nuevo HEAD. Preguntar al usuario solo si QA rechaza dos veces la misma tarea, si hace falta una decisión de diseño que el encargo no cubre, si algo no cuadra o antes de una acción hacia fuera (push, publicación).
 - Nunca canalizar `git rebase`, `git merge` ni `git commit` (`| tail`, `| grep`): el código de salida se pierde y el flujo sigue sobre una operación a medias. Comprobar siempre el código de salida y `git status` antes de lanzar el siguiente paso.
 - Con conflictos, los resuelve Claude, nunca un agente. La puerta de permisos deniega a todos los roles comandos de git que modifiquen el índice, historial o ramas.
-- El rol (`--role`) limita qué archivos puede editar el agente: `docs` solo documentación, `qa` veredicto/artefactos/mutaciones temporales, `vision` y `research` solo `artifacts/`. El lanzador lo pasa en `AGY_ROLE` y el gate registra rol y decisión en `gate.log`.
+- El rol (`--role`) limita qué archivos puede editar el agente: `docs` solo documentación, `qa` solo veredicto y `artifacts/` (las mutaciones, sobre copias en `artifacts/qa-mutantes/`), `vision` y `research` solo `artifacts/`. El lanzador lo pasa en `AGY_ROLE` y el gate registra rol y decisión en `gate.log`.
 
 ## Auditoría obligatoria antes de aceptar
 

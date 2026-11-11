@@ -3,5 +3,4 @@ artifacts/
 .worktrees/
 .agents/hooks/gate.log
 .qa-verdict.json
-*.qa-bak
 *.relevo-new
