@@ -1,9 +1,10 @@
 /* Agent run model and provider adapters (agy, Codex). No agent CLI, network or browser is used. */
 const assert = require('node:assert/strict');
+const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { Run } = require('../lib/runs.cjs');
+const { Run, reserveRunNumber } = require('../lib/runs.cjs');
 const { PROVIDERS, detectProvider, classifyTool } = require('../lib/providers.cjs');
 
 const failures = [];
@@ -169,6 +170,80 @@ test('(m) meta sin pid y sin endedAt sigue running tras poll', () => {
   assert.equal(run.status, 'running');
 });
 
-fs.rmSync(tmp, { recursive: true, force: true });
-console.log(`\nagent runs: ${passed} passed, ${failures.length} failed.`);
-if (failures.length) process.exitCode = 1;
+test('(n) en una carpeta temporal vacía, tres llamadas seguidas a reserveRunNumber devuelven 01, 02 y 03', () => {
+  const dir = fs.mkdtempSync(path.join(tmp, 'reserve-n-'));
+  assert.equal(reserveRunNumber(dir, []), '01');
+  assert.equal(reserveRunNumber(dir, []), '02');
+  assert.equal(reserveRunNumber(dir, []), '03');
+});
+
+// Añadida por el auditor: fuerza de forma determinista la carrera que (p) solo provoca a veces.
+// nextRunNumber no ve el marcador (otro proceso lo creó justo después de leer la carpeta),
+// así que el primer mkdir choca con EEXIST y la reserva debe pasar al número siguiente.
+test('(o2) si el número calculado ya está reservado (EEXIST), reserveRunNumber pasa al siguiente', () => {
+  const dir = fs.mkdtempSync(path.join(tmp, 'reserve-race-'));
+  fs.mkdirSync(path.join(dir, '.reserva-01'));
+  const realReaddir = fs.readdirSync;
+  fs.readdirSync = (target, ...rest) => (path.resolve(String(target)) === path.resolve(dir) ? [] : realReaddir(target, ...rest));
+  let reserved;
+  try { reserved = reserveRunNumber(dir, []); } finally { fs.readdirSync = realReaddir; }
+  assert.equal(reserved, '02');
+  assert.ok(fs.existsSync(path.join(dir, '.reserva-02')));
+});
+
+test('(o) en una carpeta temporal con 05-a/ y .reserva-07/ ya creadas, reserveRunNumber devuelve 08', () => {
+  const dir = fs.mkdtempSync(path.join(tmp, 'reserve-o-'));
+  fs.mkdirSync(path.join(dir, '05-a'));
+  fs.mkdirSync(path.join(dir, '.reserva-07'));
+  assert.equal(reserveRunNumber(dir, []), '08');
+});
+
+test('(q) discoverRuns no lista las carpetas .reserva-NN', () => {
+  const runsPattern = /^\d+-/;
+  assert.equal(runsPattern.test('.reserva-01'), false);
+  assert.equal(runsPattern.test('.reserva-07'), false);
+  assert.equal(runsPattern.test('.reserva-99'), false);
+});
+
+async function testAsync(name, action) {
+  try {
+    await action();
+    passed++;
+    console.log(`PASS ${name}`);
+  } catch (error) {
+    failures.push({ name, error });
+    console.error(`FAIL ${name}: ${error.message}`);
+  }
+}
+
+(async () => {
+  await testAsync('(p) concurrencia: 6 procesos reservan números distintos', async () => {
+    const dir = fs.mkdtempSync(path.join(tmp, 'reserve-p-'));
+    const runsModule = JSON.stringify(path.resolve(__dirname, '../lib/runs.cjs'));
+    const tempDir = JSON.stringify(dir);
+    const script = `const { reserveRunNumber } = require(${runsModule}); console.log(reserveRunNumber(${tempDir}, []));`;
+    const promises = Array.from({ length: 6 }, () => new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ['-e', script], { cwd: os.tmpdir() });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (chunk) => { stdout += chunk; });
+      child.stderr.on('data', (chunk) => { stderr += chunk; });
+      child.on('error', reject);
+      child.on('close', (code) => {
+        resolve({ code, stdout: stdout.trim(), stderr: stderr.trim() });
+      });
+    }));
+    const results = await Promise.all(promises);
+    for (const res of results) {
+      assert.equal(res.code, 0, `proceso terminó con código ${res.code}: ${res.stderr}`);
+    }
+    const numbers = results.map((r) => r.stdout);
+    assert.equal(numbers.length, 6);
+    const unique = new Set(numbers);
+    assert.equal(unique.size, 6, `números duplicados: ${numbers.join(', ')}`);
+  });
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+  console.log(`\nagent runs: ${passed} passed, ${failures.length} failed.`);
+  if (failures.length) process.exitCode = 1;
+})();
