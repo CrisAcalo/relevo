@@ -162,6 +162,40 @@ test('clave desconocida → aviso, no error', () => {
   }
 });
 
+test('roleScopes se combina por rol con los valores por defecto', () => {
+  const testDir = path.join(tmpBase, 'rolescopes-merge');
+  fs.mkdirSync(testDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(testDir, 'relevo.config.json'),
+    JSON.stringify({
+      gate: { roleScopes: { qa: ['^lib/'] } },
+    })
+  );
+  const config = loadConfig(testDir);
+  assert.deepEqual(config.gate.roleScopes.qa, ['^lib/']);
+  assert.deepEqual(config.gate.roleScopes.docs, DEFAULTS.gate.roleScopes.docs);
+  assert.deepEqual(config.gate.roleScopes.vision, DEFAULTS.gate.roleScopes.vision);
+  assert.deepEqual(config.gate.roleScopes.research, DEFAULTS.gate.roleScopes.research);
+  assert.deepEqual(config.gate.roleScopes.review, DEFAULTS.gate.roleScopes.review);
+});
+
+test('roleScopes acepta null para quitar la restricción de un rol', () => {
+  const testDir = path.join(tmpBase, 'rolescopes-null');
+  fs.mkdirSync(testDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(testDir, 'relevo.config.json'),
+    JSON.stringify({
+      gate: { roleScopes: { qa: null } },
+    })
+  );
+  let config;
+  assert.doesNotThrow(() => {
+    config = loadConfig(testDir);
+  });
+  assert.equal(config.gate.roleScopes.qa, null);
+  assert.deepEqual(config.gate.roleScopes.docs, DEFAULTS.gate.roleScopes.docs);
+});
+
 // Limpieza
 try {
   fs.rmSync(tmpBase, { recursive: true, force: true });

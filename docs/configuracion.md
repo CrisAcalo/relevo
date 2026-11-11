@@ -33,7 +33,7 @@ Todas las claves son opcionales.
 | `gate.scriptsDirs` | Carpetas de scripts que los agentes pueden ejecutar con `node` | `["scripts"]` |
 | `gate.npmScripts` | Scripts npm permitidos (`*` como comodín final) | `check`, `verify`, `build`, `dev`, `preview`, `test`, `test:*`, `check:*` |
 | `gate.sensitivePaths` | Rutas protegidas | `.env`, `artifacts/.cache` |
-| `gate.roleScopes` | Expresiones regulares de rutas editables por rol; un rol sin entrada no tiene restricción | ver abajo |
+| `gate.roleScopes` | Expresiones regulares de rutas editables por rol. Se combina por rol con los valores por defecto: un rol que defines sustituye solo la lista de ese rol; `null` quita la restricción de ese rol y `[]` no le permite editar nada. Un rol sin entrada (como `coder`) no tiene restricción | ver abajo |
 | `check.baseBranch` | Rama base | `main` |
 | `check.sourcePattern` | Código que exige pruebas | `^src/` |
 | `check.testPattern` | Archivos que cuentan como pruebas | `^(scripts/test-[\w.-]+\.cjs\|test/[\w./-]+)$` |
@@ -54,6 +54,8 @@ Una clave desconocida o un valor de tipo incorrecto es un error. Si `relevo.conf
 | `qa` | `.qa-verdict.json`, `artifacts/`, `*.qa-bak` y, para las mutaciones temporales, `src/`, `scripts/` y `test/`. |
 | `review` | `artifacts/` y `.qa-verdict.json`. |
 | `vision`, `research` | `artifacts/`. |
+
+Para ampliar el ámbito de un rol, define solo ese rol; los demás conservan sus valores por defecto. Por ejemplo, `{"gate":{"roleScopes":{"qa":["^\\.qa-verdict\\.json$","^artifacts/","\\.qa-bak$","^lib/","^test/"]}}}` cambia solo `qa`. La lista sustituye a la de ese rol (no se suma), así que repite las rutas por defecto que quieras mantener. `{"qa": null}` deja a `qa` sin restricción.
 
 ### Ejemplo
 
