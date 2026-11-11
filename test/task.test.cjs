@@ -728,6 +728,52 @@ test('(ab) con testCommand que falla, salida !== 0, stderr contiene Las pruebas 
   assert.equal(mainAfter, mainBefore);
 });
 
+test('(ac) sin testCommand en la base: task integrate avisa en stderr y código es 0; con --sin-pruebas no avisa', () => {
+  const bin = path.resolve(__dirname, '../bin/relevo.cjs');
+
+  const repo1 = makeGitRepo(tmpBase);
+  fs.writeFileSync(path.join(repo1, '.gitignore'), 'node_modules/\n');
+  execFileSync('git', ['add', '.gitignore'], { cwd: repo1 });
+  execFileSync('git', ['commit', '-m', 'gitignore', '-q'], { cwd: repo1 });
+
+  taskNew({ name: 'feat-ac1', cwd: repo1, silent: true });
+  const wtDir1 = path.join(repo1, '.worktrees', 'feat-ac1');
+  fs.writeFileSync(path.join(wtDir1, 'a.txt'), 'contenido ac1\n');
+  execFileSync('git', ['add', 'a.txt'], { cwd: wtDir1 });
+  execFileSync('git', ['commit', '-m', 'commit ac1', '-q'], { cwd: wtDir1 });
+
+  const res1 = spawnSync(
+    process.execPath,
+    [bin, 'task', 'integrate', 'feat-ac1'],
+    { cwd: repo1, encoding: 'utf8' }
+  );
+
+  assert.equal(res1.status, 0);
+  assert.ok(res1.stderr.includes('no se ejecutan pruebas porque check.testCommand no está configurado'));
+  assert.ok(fs.existsSync(path.join(repo1, 'a.txt')));
+
+  const repo2 = makeGitRepo(tmpBase);
+  fs.writeFileSync(path.join(repo2, '.gitignore'), 'node_modules/\n');
+  execFileSync('git', ['add', '.gitignore'], { cwd: repo2 });
+  execFileSync('git', ['commit', '-m', 'gitignore', '-q'], { cwd: repo2 });
+
+  taskNew({ name: 'feat-ac2', cwd: repo2, silent: true });
+  const wtDir2 = path.join(repo2, '.worktrees', 'feat-ac2');
+  fs.writeFileSync(path.join(wtDir2, 'b.txt'), 'contenido ac2\n');
+  execFileSync('git', ['add', 'b.txt'], { cwd: wtDir2 });
+  execFileSync('git', ['commit', '-m', 'commit ac2', '-q'], { cwd: wtDir2 });
+
+  const res2 = spawnSync(
+    process.execPath,
+    [bin, 'task', 'integrate', 'feat-ac2', '--sin-pruebas'],
+    { cwd: repo2, encoding: 'utf8' }
+  );
+
+  assert.equal(res2.status, 0);
+  assert.equal(res2.stderr.includes('no se ejecutan pruebas porque check.testCommand no está configurado'), false);
+  assert.ok(fs.existsSync(path.join(repo2, 'b.txt')));
+});
+
 // Limpieza general
 try {
   fs.rmSync(tmpBase, { recursive: true, force: true });
