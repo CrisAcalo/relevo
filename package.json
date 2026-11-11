@@ -1,6 +1,6 @@
 {
   "name": "relevo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Claude planifica y audita; agentes de otros proveedores (Antigravity, Codex…) implementan en worktrees con permisos acotados por rol, y nada se integra sin verificación independiente.",
   "license": "MIT",

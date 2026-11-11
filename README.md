@@ -7,10 +7,11 @@
 Claude planifica y audita. Agentes de otros proveedores implementan en worktrees aislados con permisos acotados por rol.<br>
 Nada llega a la rama principal sin verificación independiente.
 
+[![Pruebas](https://github.com/CrisAcalo/relevo/actions/workflows/pruebas.yml/badge.svg)](https://github.com/CrisAcalo/relevo/actions/workflows/pruebas.yml)
 ![Node.js ≥ 22.12](https://img.shields.io/badge/node-%E2%89%A5%2022.12-339933?logo=node.js&logoColor=white)
 ![Dependencias: 0](https://img.shields.io/badge/dependencias-0-brightgreen)
 ![Windows · Linux · macOS](https://img.shields.io/badge/plataformas-Windows%20%C2%B7%20Linux%20%C2%B7%20macOS-informational)
-![Estado: 0.1.0](https://img.shields.io/badge/estado-0.1.0%20en%20desarrollo-orange)
+![Versión 0.2.0](https://img.shields.io/badge/versi%C3%B3n-0.2.0-orange)
 [![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-blue)](LICENSE)
 
 [Inicio rápido](#inicio-rápido) · [Cómo funciona](#cómo-funciona) · [Seguridad](#seguridad) · [Documentación](#documentación)
@@ -21,40 +22,45 @@ Nada llega a la rama principal sin verificación independiente.
 
 ## Por qué relevo
 
-Los modelos rápidos y económicos, como Gemini Flash, escriben código a gran velocidad, pero dejarlos trabajar solos sobre un repositorio es arriesgado: suponen lo que el encargo no dice, escriben pruebas que no prueban nada y, con permisos amplios, pueden tocar lo que no deben.
+Los modelos rápidos y económicos, como Gemini Flash, escriben código a gran velocidad. Dejarlos trabajar solos sobre un repositorio, en cambio, es arriesgado: suponen lo que el encargo no dice, escriben pruebas que no prueban nada y, con permisos amplios, pueden tocar lo que no deben.
 
-relevo reparte el trabajo como una carrera de relevos. **Claude Code** dirige: escribe encargos precisos, audita cada entrega y hace los commits. **Los agentes** (hoy Antigravity CLI `agy`, con un adaptador para OpenAI Codex) implementan, documentan y hacen QA, cada uno en su carril. Quien escribe el código nunca emite el veredicto.
+relevo reparte el trabajo como una carrera de relevos:
+- **Claude Code** dirige: escribe encargos precisos, audita cada entrega e integra.
+- **Los agentes** implementan, documentan y hacen QA, cada uno en su carril. Hoy son agentes de Antigravity CLI `agy`, y hay un adaptador para OpenAI Codex.
+
+Quien escribe el código nunca emite el veredicto.
 
 ## Características
 
-- **Worktrees por tarea**: cada agente trabaja en su propio worktree y su propia rama; el árbol principal no se toca.
-- **Permisos por rol**: una puerta de permisos intercepta cada herramienta y comando. Deniega git de escritura, dependencias, red y borrados recursivos, y limita qué archivos puede editar cada rol.
-- **QA independiente con mutaciones**: un agente distinto rompe el código a propósito para comprobar que las pruebas lo detectan, y emite un veredicto con esquema estricto atado al commit.
+- **Worktrees por tarea**: cada agente trabaja en su propio worktree y su propia rama, sin tocar el árbol principal. Varias tareas independientes avanzan en paralelo.
+- **Permisos por rol**: una puerta de permisos intercepta cada herramienta y comando. Deniega git de escritura, dependencias, red, borrados recursivos y `Start-Process`, incluidas sus variantes (`npm.cmd install`, `git -C . commit`, `& "git.exe" push`…). También limita qué archivos puede editar cada rol.
+- **QA independiente con mutaciones**: un agente distinto rompe el código, siempre en una copia, para comprobar que las pruebas lo detectan. Después emite un veredicto con esquema estricto atado al parche.
+- **Ciclo proporcional al riesgo**: los cambios acotados se integran tras la auditoría; las zonas críticas pasan además por QA.
+- **Git en un solo comando**: `relevo task integrate` rebasa si hace falta, ejecuta las pruebas, pasa la definición de hecho, integra y limpia. Un rebase sin conflictos conserva el veredicto.
 - **Definición de hecho mecánica**: `relevo check` impide integrar sin pruebas, sin veredicto válido o con la documentación desactualizada.
 - **Agentes en segundo plano, a la vista**: `relevo watch` muestra en vivo qué hace cada agente, cuánto tarda y cuántos tokens consume.
-- **Control de cupos**: `relevo quota` consulta el cupo sin gastar tokens, y `relevo run` no lanza agentes que se quedarían a medias.
-- **Sin dependencias**: solo Node.js; funciona igual en Windows, Linux y macOS.
+- **Sin dependencias**: solo Node.js. Probado en CI en Windows y Linux.
 
 ## Cómo funciona
 
 ```mermaid
 flowchart LR
-    A[Claude<br>encargo] --> B[coder<br>implementa]
-    B --> C[Claude<br>auditoría]
-    C --> D[documentalista<br>documenta]
-    D --> E[qa<br>pruebas y mutaciones]
-    E --> F[Claude<br>relevo check]
-    F --> G[(main)]
-    C -. hallazgos .-> H[agente nuevo<br>corrección]
+    A[Claude<br>encargo] --> B[coder<br>código, pruebas<br>y documentación]
+    B --> C[Claude<br>auditoría y<br>mutaciones]
+    C -->|ciclo ligero| F[relevo task<br>integrate]
+    C -->|zona crítica| E[qa<br>barrido propio]
+    E -->|aprobado| F
+    E -. rechazado .-> H[agente nuevo<br>corrección]
+    C -. hallazgos .-> H
     H --> C
+    F --> G[(main)]
 ```
 
 1. **Encargo.** Claude redacta una especificación cerrada: archivos exactos, contratos, invariantes y pruebas que deben fallar sin el cambio.
-2. **Implementación.** Un agente `coder` trabaja en segundo plano en su worktree.
-3. **Auditoría.** Claude no confía en el resumen del agente: lee el diff, ejecuta las pruebas y hace su propio barrido. Cada corrección va a un agente nuevo con un encargo preciso.
-4. **Documentación.** Un agente `docs` actualiza la documentación a partir del diff real.
-5. **QA.** Un agente `qa` ejecuta las suites, aplica mutaciones y escribe `.qa-verdict.json`.
-6. **Integración.** `relevo check` valida el ciclo y Claude integra en la rama principal.
+2. **Implementación.** Un agente `coder` escribe código, pruebas y documentación en su worktree, en segundo plano.
+3. **Auditoría.** Claude no confía en el resumen del agente. Lee el diff, ejecuta las pruebas, rompe el código a propósito para comprobar que las pruebas lo detectan y hace su propio barrido. Cada corrección va a un agente nuevo.
+4. **QA**, solo en zonas críticas. Un agente `qa` independiente intenta demostrar que el cambio está mal y escribe `.qa-verdict.json`.
+5. **Integración.** `relevo task integrate` comprueba todo e integra por fast-forward, sin pedir aprobación cuando el ciclo se cumple.
 
 El procedimiento completo está en la [decisión 02](docs/decisions/02-flujo-claude-agentes.md) y en la skill [`delegar-agy`](templates/skills/delegar-agy/SKILL.md).
 
@@ -78,7 +84,13 @@ relevo doctor
 
 ¿Tu proyecto ya tenía una copia del flujo de agentes? Sigue [Migrar desde una copia incrustada](docs/configuracion.md#migrar-desde-una-copia-incrustada).
 
-`relevo init` añade al proyecto la configuración, las skills de Claude Code, los agentes `qa` y `documentalista` y la puerta de permisos. Después, rellena los marcadores `<<PROYECTO: …>>` de las plantillas y aplica la [configuración global de agy](templates/agy-settings.example.md). Detalles en [Configuración](docs/configuracion.md).
+`relevo init` añade al proyecto un `relevo.config.json` vacío, las skills de Claude Code, los agentes `qa` y `documentalista` y la puerta de permisos. Después:
+
+1. Rellena los marcadores `<<PROYECTO: …>>` de las plantillas, sobre todo las **zonas críticas** de `delegar-agy`, que deciden qué tareas pasan por QA.
+2. En `relevo.config.json`, configura solo lo que difiera de los valores por defecto. Como mínimo, `check.testCommand`, para que `task integrate` ejecute tus pruebas.
+3. Aplica la [configuración global de agy](templates/agy-settings.example.md).
+
+Detalles en [Configuración](docs/configuracion.md).
 
 **Una tarea de principio a fin:**
 
@@ -91,9 +103,11 @@ relevo run --provider agy --role coder \
   --brief encargos/mi-tarea.md            # lanza el agente en segundo plano
 
 relevo watch                              # síguelo en vivo
-relevo check                              # definición de hecho, tras la auditoría y QA
-relevo task done mi-tarea                 # limpia el worktree una vez integrado
+
+relevo task integrate mi-tarea            # rebase, pruebas, check, fast-forward y limpieza
 ```
+
+Para actualizar relevo en un proyecto: `git pull` en el clon de relevo y `relevo update --apply` en el proyecto. Las skills que hayas personalizado no se tocan: la plantilla nueva queda al lado como `.relevo-new`.
 
 ### Comandos
 
@@ -101,7 +115,7 @@ relevo task done mi-tarea                 # limpia el worktree una vez integrado
 |---|---|
 | `relevo init` | Instala configuración, plantillas y puerta de permisos en el proyecto. |
 | `relevo doctor` | Comprueba el entorno, la configuración global de agy y la instalación. |
-| `relevo task new \| done \| list` | Crea, cierra y lista worktrees de tarea. |
+| `relevo task new \| integrate \| done \| list` | Crea, integra, cierra y lista tareas con su worktree. |
 | `relevo run` | Lanza un agente con proveedor, rol, modelo y encargo. |
 | `relevo watch` | Panel en vivo de los agentes. |
 | `relevo quota` | Cupos restantes del proveedor, sin consumir tokens. |
@@ -114,8 +128,12 @@ Opciones y comportamiento de cada comando en la [referencia de comandos](docs/co
 
 relevo protege en dos capas:
 
-1. **Configuración global de agy**, que aplica el usuario: `toolPermission: "always-proceed"` para que el agente avance sin aprobaciones manuales, y reglas `deny` mínimas. `relevo doctor` comprueba que estén.
-2. **Puerta de permisos del repositorio**: un hook `PreToolUse` que deniega a todos los roles git de escritura, cambios de dependencias, red, borrados recursivos, ejecución dinámica, navegadores visibles y rutas sensibles, y que limita las rutas editables por rol. Registra cada decisión en `.agents/hooks/gate.log`.
+1. **Configuración global de agy**, que aplica el usuario: `toolPermission: "always-proceed"`, para que el agente avance sin aprobaciones manuales, y reglas `deny` mínimas. `relevo doctor` comprueba que estén.
+2. **Puerta de permisos del repositorio**: un hook `PreToolUse`.
+   - Deniega a todos los roles git de escritura, cambios de dependencias, red, borrados recursivos, ejecución dinámica, `Start-Process`, navegadores visibles y rutas sensibles.
+   - Cada regla se comprueba sobre el comando tal cual y sobre su **forma canónica**: sin extensiones `.exe` y `.cmd`, sin opciones globales de git y sin comillas.
+   - Limita las rutas editables por rol: QA no puede editar código.
+   - Registra cada decisión en `.agents/hooks/gate.log`.
 
 Además, ningún lanzador añade flags que desactiven permisos o sandbox, y las claves de los proveedores viven solo en variables de entorno.
 
@@ -126,41 +144,54 @@ Cada regla tiene documentado qué protege y qué incidente real la motivó: [por
 
 ## Construido con relevo
 
-relevo se ha desarrollado con su propio flujo. Claude Code planificó, redactó los encargos y auditó; seis agentes `agy` con Gemini 3.8 Flash High escribieron el código, lanzados por parejas en paralelo:
+relevo se desarrolla con su propio flujo. Claude Code planifica, redacta los encargos y audita; agentes `agy` con Gemini 3.8 Flash High escriben el código y hacen QA.
 
-| Ejecución | Encargo | Duración | Tokens |
-|---|---|---:|---:|
-| `01-relevo-config` | Configuración, política y `check` parametrizados; `init` | 17 min | 383k |
-| `02-relevo-plantillas` | Plantillas genéricas de skills y agentes | 9 min | 220k |
-| `03-task-update` | `task` y `update` | 10 min | 363k |
-| `04-doctor-veredicto` | `doctor` y esquema estricto del veredicto | 11 min | 280k |
-| `05-update-base` | Corrección: fusión a tres bandas en `update` | 7 min | 158k |
-| `06-doctor-gitignore` | Corrección: `doctor` con `git check-ignore` | 6 min | 189k |
-| | **Total** | **≈ 1 h** | **1,6 M** |
+| | |
+|---|---|
+| Ejecuciones de agentes | **52**: 32 de código, 17 de QA y 3 de documentación e investigación |
+| Tiempo de agente | **6,2 h**, varias tareas en paralelo |
+| Tokens de Gemini Flash | **8,7 M** |
+| Pruebas | **178** en 12 suites, en Windows y Linux |
 
-Las dos últimas son rondas de corrección. La auditoría de Claude detectó, leyendo el código, que `update` habría ofrecido la misma plantilla para siempre ([incidente R-03](docs/incidentes.md#r-03--update-habría-ofrecido-la-misma-plantilla-para-siempre-auditoría-2026-11-10)) y que `doctor` daba avisos falsos. Ninguno de los dos fallos lo detectaban las pruebas del agente.
+Lo que la verificación independiente encontró y las pruebas de los agentes no:
+- **QA rechazó entregas por fallos reales.**
+  - `git branch --delete` se permitía como lectura.
+  - Un `node_modules` con seguimiento se ocultaba a `check`.
+  - `cmd /k start` esquivaba la regla de `Start-Process`.
+- **La auditoría de Claude** detectó pruebas que no fallaban con el código roto y añadió los casos que faltaban. También vio que `update` habría ofrecido la misma plantilla para siempre ([R-03](docs/incidentes.md#r-03--update-habría-ofrecido-la-misma-plantilla-para-siempre-auditoría-2026-11-10)).
+- **El CI**, en su primera ejecución, encontró que `check` fallaba en Linux con el enlace `node_modules` de los worktrees. En Windows no se veía.
+- **Instalarlo en un proyecto real**, como lo haría un usuario nuevo, destapó seis tropiezos de `init`, `doctor`, `check` y la documentación, ya corregidos.
 
-El flujo nació antes, en el proyecto «Procedural // Studio», donde se validó con tareas reales de código, QA E2E, investigación y análisis de capturas ([decisión 01](docs/decisions/01-origen-y-alcance.md)).
+El flujo nació en el proyecto «Procedural // Studio», que hoy usa relevo como herramienta ([decisión 01](docs/decisions/01-origen-y-alcance.md)). Cada fallo y su regla están en el [registro de incidentes](docs/incidentes.md).
 
 ## Documentación
 
 | Documento | Contenido |
 |---|---|
 | [Comandos](docs/comandos.md) | Referencia completa de cada comando y del formato del veredicto de QA. |
-| [Configuración](docs/configuracion.md) | Qué instala `init`, `relevo.config.json` y el ámbito de cada rol. |
+| [Configuración](docs/configuracion.md) | Qué instala `init`, `relevo.config.json`, el ámbito de cada rol y cómo migrar desde una copia incrustada. |
 | [Por qué existe cada regla](docs/por-que-cada-regla.md) | Qué protege cada regla y su origen. Léelo antes de relajar una. |
 | [Registro de incidentes](docs/incidentes.md) | Fallos reales, con síntoma, causa y regla resultante. |
 | [Decisión 01 · Origen, alcance y nombre](docs/decisions/01-origen-y-alcance.md) | De dónde sale relevo y qué se generalizó. |
-| [Decisión 02 · Flujo Claude + agentes](docs/decisions/02-flujo-claude-agentes.md) | El ciclo de una tarea, roles y definición de hecho. |
+| [Decisión 02 · Flujo Claude + agentes](docs/decisions/02-flujo-claude-agentes.md) | El ciclo de una tarea, roles, autonomía y ciclo proporcional. |
 
 ## Estado
 
-relevo está en **0.1.0**, en desarrollo activo y sin publicar en npm.
+relevo está en **0.2.0**, en uso real y sin publicar en npm.
 
 | Proveedor | Estado |
 |---|---|
-| Antigravity CLI (`agy`) | Validado en uso real con Gemini Flash High y Argon. |
-| OpenAI Codex CLI (`codex`) | Adaptador implementado y probado con eventos sintéticos; falta validarlo con una ejecución real. |
+| Antigravity CLI (`agy`) | Validado en uso real con Gemini Flash High y Argon. El encargo viaja por stdin, sin límite de longitud. |
+| OpenAI Codex CLI (`codex`) | Lanzamiento y lectura de eventos validados con una ejecución real. El modelo debe indicarse con `--model` y depende del tipo de cuenta. |
+
+**Novedades de 0.2.0:**
+- `relevo task integrate` y el ciclo proporcional.
+- Veredicto válido tras un rebase con el mismo parche.
+- Forma canónica de comandos en la puerta y `Start-Process` denegado.
+- QA muta copias, nunca el código.
+- `relevo task done` retoma cierres interrumpidos y `watch` marca las ejecuciones interrumpidas.
+- `relevo check` funciona en Linux y en ramas sin commits.
+- CI en Windows y Linux.
 
 ## Desarrollo
 
@@ -169,7 +200,7 @@ npm test                    # en Windows: npm.cmd test
 node bin/relevo.cjs check
 ```
 
-El código es CommonJS sin dependencias de terceros: solo módulos `node:`. Los cambios siguen el propio flujo de relevo. Convenciones en [CLAUDE.md](CLAUDE.md).
+El código es CommonJS sin dependencias de terceros: solo módulos `node:`. Los cambios siguen el propio flujo de relevo. Las convenciones están en [CLAUDE.md](CLAUDE.md).
 
 ## Licencia
 
