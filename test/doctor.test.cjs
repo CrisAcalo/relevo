@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -275,6 +276,70 @@ try {
       }
     } finally {
       fs.writeFileSync(gitignorePath, originalGitignore, 'utf8');
+    }
+  });
+
+  test('(m) puerta desactualizada (hash coincide con lock) -> aviso sin --force', () => {
+    const gatePath = path.join(repoDir, '.agents', 'hooks', 'permission-gate.cjs');
+    const lockPath = path.join(repoDir, '.agents', 'relevo.lock.json');
+    const origGate = fs.readFileSync(gatePath, 'utf8');
+    const origLock = fs.readFileSync(lockPath, 'utf8');
+
+    try {
+      const oldGateContent = '// puerta anterior\n';
+      fs.writeFileSync(gatePath, oldGateContent, 'utf8');
+      const oldHash = crypto.createHash('sha256').update(oldGateContent).digest('hex');
+      const lockObj = JSON.parse(origLock);
+      lockObj.files = lockObj.files || {};
+      lockObj.files['.agents/hooks/permission-gate.cjs'] = oldHash;
+      fs.writeFileSync(lockPath, JSON.stringify(lockObj, null, 2), 'utf8');
+
+      const res = runDoctorCli(repoDir, settingsFile, ['--json']);
+      const gateCheck = res.parsed.checks.find((c) => c.id === 'gate');
+      assert.equal(gateCheck.status, 'aviso');
+      assert.ok(
+        gateCheck.message.includes('está desactualizada (sin cambios locales)'),
+        `debe indicar desactualizada: ${gateCheck.message}`
+      );
+      assert.ok(
+        gateCheck.message.includes('relevo update --apply"'),
+        `debe recomendar relevo update --apply": ${gateCheck.message}`
+      );
+      assert.ok(
+        !gateCheck.message.includes('--force'),
+        `no debe incluir --force: ${gateCheck.message}`
+      );
+    } finally {
+      fs.writeFileSync(gatePath, origGate, 'utf8');
+      fs.writeFileSync(lockPath, origLock, 'utf8');
+    }
+  });
+
+  test('(n) puerta modificada a mano sin lockfile -> aviso con --force', () => {
+    const gatePath = path.join(repoDir, '.agents', 'hooks', 'permission-gate.cjs');
+    const lockPath = path.join(repoDir, '.agents', 'relevo.lock.json');
+    const origGate = fs.readFileSync(gatePath, 'utf8');
+    const origLock = fs.readFileSync(lockPath, 'utf8');
+
+    try {
+      const oldGateContent = '// puerta anterior\n';
+      fs.writeFileSync(gatePath, oldGateContent, 'utf8');
+      fs.unlinkSync(lockPath);
+
+      const res = runDoctorCli(repoDir, settingsFile, ['--json']);
+      const gateCheck = res.parsed.checks.find((c) => c.id === 'gate');
+      assert.equal(gateCheck.status, 'aviso');
+      assert.ok(
+        gateCheck.message.includes('está modificada a mano'),
+        `debe indicar modificada a mano: ${gateCheck.message}`
+      );
+      assert.ok(
+        gateCheck.message.includes('relevo update --apply --force'),
+        `debe recomendar relevo update --apply --force: ${gateCheck.message}`
+      );
+    } finally {
+      fs.writeFileSync(gatePath, origGate, 'utf8');
+      fs.writeFileSync(lockPath, origLock, 'utf8');
     }
   });
 } finally {
