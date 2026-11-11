@@ -470,6 +470,10 @@ test('Start-Process y sus alias se deniegan; npm start y nombres parecidos no', 
     // Añadidos por el auditor: el alias start lanzando algo que ninguna otra regla deniega.
     'start notepad.exe',
     'cmd /c start calc.exe',
+    'cmd /k start calc.exe',
+    'cmd.exe /k start calc.exe',
+    'cmd /k "start calc.exe"',
+    'cmd /r start calc.exe',
   ]) {
     assert.equal(run(command), 'deny', command);
   }
@@ -486,9 +490,12 @@ test('Start-Process y sus alias se deniegan; npm start y nombres parecidos no', 
     'node scripts/start-server.cjs',
     'Select-String -Path src -Pattern "Start-Processing"',
     'echo restart',
+    'cmd /k echo start',
   ]) {
     assert.notEqual(run(command), 'deny', command);
   }
+  assert.equal(run('Start-Job { git push }'), 'deny');
+  assert.equal(run('Start-Job -ScriptBlock { npm.cmd install x }'), 'deny');
 });
 
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
