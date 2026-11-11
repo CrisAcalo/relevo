@@ -312,5 +312,95 @@ test('git branch solo se permite para listar', () => {
   }
 });
 
+function edit(tempDecide, tempRepo, rel, role) {
+  return tempDecide({
+    toolCall: { name: 'replace_file_content', args: { Path: path.join(tempRepo, rel) } },
+  }, { AGY_ROLE: role }).decision;
+}
+
+test('redefinir un rol en roleScopes no quita la restricción de los demás', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-r1-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+    gate: { roleScopes: { qa: ['^lib/'] } },
+  }));
+
+  for (const role of ['docs', 'vision', 'research', 'review']) {
+    assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', role), 'deny', role);
+  }
+  assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', 'qa'), 'allow');
+  assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', 'coder'), 'ask');
+
+  assert.equal(edit(tempDecide, tempRepo, 'docs/a.md', 'docs'), 'allow');
+  assert.equal(edit(tempDecide, tempRepo, 'artifacts/a.txt', 'vision'), 'allow');
+
+  assert.equal(edit(tempDecide, tempRepo, 'test/x.test.cjs', 'qa'), 'deny');
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('roleScopes: null quita la restricción de un rol y [] no permite nada', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-r2-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+    gate: { roleScopes: { qa: null, docs: [] } },
+  }));
+
+  assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', 'qa'), 'ask');
+  assert.equal(edit(tempDecide, tempRepo, 'docs/a.md', 'docs'), 'deny');
+  assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', 'vision'), 'deny');
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('roleScopes inválido sigue denegando todo', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-r3-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  const configs = [
+    { gate: { roleScopes: null } },
+    { gate: { roleScopes: { qa: '^lib/' } } },
+    { gate: { roleScopes: { qa: [1] } } },
+    { gate: { roleScopes: { qa: ['('] } } },
+  ];
+
+  for (const cfg of configs) {
+    fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify(cfg));
+    assert.equal(edit(tempDecide, tempRepo, 'docs/a.md', 'docs'), 'deny', JSON.stringify(cfg));
+    const res = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'git status' } } }, {});
+    assert.equal(res.decision, 'deny', JSON.stringify(cfg));
+  }
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('un rol con nombre de propiedad heredada no rompe la puerta', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-r4-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', 'constructor'), 'ask');
+  assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', 'toString'), 'ask');
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
