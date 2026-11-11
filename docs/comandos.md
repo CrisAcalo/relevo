@@ -59,6 +59,8 @@ Compara la rama actual con su base (`git merge-base`). No ejecuta suites: compru
 
 También sugiere las suites E2E del área tocada (`check.areaSuites`). Opciones: `--base <ref>`, `--docs-only`.
 
+Se ejecuta en el worktree de la tarea. La configuración (`relevo.config.json`) se lee de la raíz del repositorio principal, pero el veredicto (`check.verdictFile`) y el índice de decisiones (`check.decisions.index`, o `AGENTS.md` si no hay índice) se leen de la raíz del **worktree actual** (`git rev-parse --show-toplevel`): son de la rama que se comprueba. Un veredicto en la raíz principal no cuenta para un worktree.
+
 ## `doctor`
 
 Comprobaciones, en orden: versión de Node (≥ 22.12), git y repositorio, `agy --version` (aviso si falta: relevo funciona con otro proveedor), configuración global de agy (`RELEVO_AGY_SETTINGS` o `~/.gemini/antigravity-cli/settings.json`: aviso si falta o si `toolPermission` no es `always-proceed`; solo lee `toolPermission` y `permissions.deny` y nunca imprime otras claves, porque `trustedWorkspaces` contiene rutas personales), reglas `deny` mínimas (`git push`, `git commit`, `npm publish`, `npm install`, `npx`, `curl`), `relevo.config.json` válido, puerta instalada e idéntica a la de relevo, `hooks.json`, `.gitignore` (preguntando a git con `git check-ignore`, así una regla más amplia como `artifacts/` cuenta) y marcadores `<<PROYECTO: …>>` sin rellenar.

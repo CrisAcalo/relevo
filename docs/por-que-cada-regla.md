@@ -34,6 +34,7 @@ No ejecuta suites: comprueba que el ciclo se cumplió.
 | Cambia código fuente (`check.sourcePattern`) sin ninguna prueba (`check.testPattern`) → fallo, salvo `--no-tests-reason` | Cambios sin pruebas que los respalden | Preventiva; definición de hecho del origen |
 | Cambios sin commit → fallo | Que el veredicto de QA corresponda exactamente al código que se integra | Preventiva |
 | Falta el veredicto, es de otro commit, es "rechazado" o tiene suites fallidas → fallo | Integrar algo que QA no aprobó, o aprobó en otra versión | Preventiva; el veredicto está atado al commit, por eso el cierre de documentación va después de integrar |
+| Veredicto e índice de decisiones se leen de la raíz del worktree actual, no de la principal | Que `check` dé «Falta el veredicto» con uno válido en el worktree, acepte un veredicto de otra tarea copiado a la raíz principal o no vea una decisión añadida al índice en la rama | Incidente R-05 |
 | "Aprobado" con hallazgos de severidad alta → fallo | Veredictos incoherentes | Incidente I-12 (A3) |
 | Colores fijos nuevos en interfaz (`check.hardcodedColorFiles`) → fallo, salvo `--allow-colors` | Contrastes que solo funcionan en un tema | Incidente I-13 |
 | Código cambiado sin actualizar `check.roadmap` → fallo | Que el estado documentado se desfase del código | Incidente I-10 (A5); petición del autor de documentar siempre lo hecho y lo pendiente |
