@@ -402,5 +402,48 @@ test('un rol con nombre de propiedad heredada no rompe la puerta', () => {
   fs.rmSync(tempRepo, { recursive: true, force: true });
 });
 
+test('clave __proto__ en relevo.config.json deniega todo', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-r5-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  const configs = [
+    '{"gate":{"roleScopes":{"__proto__":["^lib/"]}}}',
+    '{"__proto__":{}}',
+    '{"gate":{"__proto__":{"roleScopes":{}}}}',
+  ];
+
+  for (const cfg of configs) {
+    fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), cfg);
+    assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', '__proto__'), 'deny', cfg);
+    assert.equal(edit(tempDecide, tempRepo, 'docs/a.md', 'docs'), 'deny', cfg);
+    const res = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'git status' } } }, {});
+    assert.equal(res.decision, 'deny', cfg);
+    assert.ok(res.reason && res.reason.includes('clave no permitida'), cfg);
+  }
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('constructor como rol en relevo.config.json funciona', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-r6-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), '{"gate":{"roleScopes":{"constructor":["^lib/"]}}}');
+
+  assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', 'constructor'), 'allow');
+  assert.equal(edit(tempDecide, tempRepo, 'src/x.cjs', 'constructor'), 'deny');
+  assert.equal(edit(tempDecide, tempRepo, 'lib/x.cjs', 'docs'), 'deny');
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;

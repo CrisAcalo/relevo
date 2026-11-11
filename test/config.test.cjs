@@ -196,6 +196,35 @@ test('roleScopes acepta null para quitar la restricción de un rol', () => {
   assert.deepEqual(config.gate.roleScopes.docs, DEFAULTS.gate.roleScopes.docs);
 });
 
+test('clave __proto__ en cualquier nivel → Error que nombra la ruta', () => {
+  const cases = [
+    { json: '{"gate":{"roleScopes":{"__proto__":["^lib/"]}}}', regex: /relevo\.config\.json: clave no permitida "gate\.roleScopes\.__proto__"/ },
+    { json: '{"gate":{"roleScopes":{"__proto__":"x"}}}', regex: /relevo\.config\.json: clave no permitida "gate\.roleScopes\.__proto__"/ },
+    { json: '{"__proto__":{"runsDir":5}}', regex: /relevo\.config\.json: clave no permitida "__proto__"/ },
+    { json: '{"check":{"areaSuites":[{"pattern":"p","suites":[],"__proto__":{}}]}}', regex: /relevo\.config\.json: clave no permitida "check\.areaSuites\[0\]\.__proto__"/ },
+    { json: '{"check":{"areaSuites":[{"pattern":"p","suites":[]},{"pattern":"q","suites":[],"__proto__":{}}]}}', regex: /relevo\.config\.json: clave no permitida "check\.areaSuites\[1\]\.__proto__"/ },
+  ];
+  for (let i = 0; i < cases.length; i++) {
+    const dir = path.join(tmpBase, `proto-${i}`);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'relevo.config.json'), cases[i].json);
+    assert.throws(() => loadConfig(dir), cases[i].regex);
+  }
+});
+
+test('constructor como rol es una clave normal', () => {
+  const dir = path.join(tmpBase, 'role-constructor');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'relevo.config.json'), '{"gate":{"roleScopes":{"constructor":["^lib/"]}}}');
+  let config;
+  assert.doesNotThrow(() => {
+    config = loadConfig(dir);
+  });
+  assert.equal(Object.hasOwn(config.gate.roleScopes, 'constructor'), true);
+  assert.deepEqual(config.gate.roleScopes.constructor, ['^lib/']);
+  assert.deepEqual(config.gate.roleScopes.docs, DEFAULTS.gate.roleScopes.docs);
+});
+
 // Limpieza
 try {
   fs.rmSync(tmpBase, { recursive: true, force: true });
