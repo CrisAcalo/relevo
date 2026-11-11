@@ -1,6 +1,6 @@
 /* Agent quota parsing and model-to-group mapping. Uses a recorded `/usage` payload; no agent CLI is called. */
 const assert = require('node:assert/strict');
-const { parseAgyUsage, quotaGroupForModel, remainingFor } = require('../lib/quota.cjs');
+const { parseAgyUsage, quotaGroupForModel, remainingFor, bucketMark } = require('../lib/quota.cjs');
 
 const failures = [];
 let passed = 0;
@@ -41,6 +41,29 @@ test('remaining uses the most restrictive window of the group', () => {
 
 test('rejects payloads without quota groups', () => {
   assert.throws(() => parseAgyUsage({ response: 'texto' }), /sin grupos/);
+});
+
+test('bucketMark with { min: 0.15, warn: 0.3 }', () => {
+  const config = { min: 0.15, warn: 0.3 };
+  assert.equal(bucketMark(0.1, config), '   ⚠ bajo');
+  assert.equal(bucketMark(0.15, config), '   · justo');
+  assert.equal(bucketMark(0.2, config), '   · justo');
+  assert.equal(bucketMark(0.3, config), '');
+  assert.equal(bucketMark(null, config), '');
+});
+
+test('bucketMark with { min: 0.5, warn: 0.7 } uses config instead of fixed 15%', () => {
+  assert.equal(bucketMark(0.4, { min: 0.5, warn: 0.7 }), '   ⚠ bajo');
+});
+
+// Añadida por el auditor: la tabla que imprime relevo quota usa los umbrales recibidos, no un valor fijo.
+test('formatQuota marca cada ventana según los umbrales recibidos', () => {
+  const { formatQuota } = require('../lib/quota.cjs');
+  const quota = { readAt: new Date().toISOString(), groups: [{ name: 'Gemini Models', buckets: [{ window: 'weekly', remaining: 0.4, resetAt: null }] }] };
+  const strict = formatQuota(quota, { min: 0.5, warn: 0.7 });
+  assert.ok(strict[1].includes('⚠ bajo'), strict[1]);
+  const lax = formatQuota(quota, { min: 0.15, warn: 0.3 });
+  assert.ok(!lax[1].includes('⚠') && !lax[1].includes('· justo'), lax[1]);
 });
 
 console.log(`\nagent quota: ${passed} passed, ${failures.length} failed.`);
