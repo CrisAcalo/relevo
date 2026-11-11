@@ -240,6 +240,11 @@ test('variantes de comandos prohibidos se deniegan (forma canónica)', () => {
     'npm --registry=https://r.example install x', 'npm.cmd -g install x',
     // Exige la segunda pasada de canonicalCommand: programa entre comillas seguido de opciones globales de git.
     '"C:/Program Files/Git/cmd/git.exe" -C . push',
+    'git branch --delete feature', 'git branch --move old new', 'git branch --force main HEAD~1',
+    'git branch -r -d origin/feature', 'git branch -rd x', 'git branch --copy a b', 'git branch -u origin/main',
+    'git branch --set-upstream-to=origin/main', 'git -C . branch --delete x',
+    'npm add lodash', 'npm remove lodash', 'npm rm lodash', 'npm un lodash', 'npm.cmd add x', 'npm r x', 'npm up', 'npm x vite',
+    'git -C. push', 'git -cuser.name=x push',
   ]) {
     assert.equal(run(command), 'deny', command);
     assert.equal(decide({
@@ -254,6 +259,7 @@ test('la forma canónica no deniega lectura ni verificación', () => {
     'git status --short', 'git diff --stat', 'git log --oneline -5', 'git show HEAD', 'git branch',
     'Get-ChildItem -Recurse src', 'Get-Content README.md -Raw', 'Get-Content docs/rd.md',
     'npm.cmd run check', 'npm run test:unit',
+    'git branch -a', 'git branch -vv', 'git branch --show-current', 'git branch -r', 'git branch --list', 'npm test',
   ]) {
     assert.equal(run(command), 'allow', command);
   }
@@ -261,6 +267,7 @@ test('la forma canónica no deniega lectura ni verificación', () => {
     'git -C . status', 'Copy-Item src/a.ts src/a.ts.qa-bak', 'Move-Item src/a.ts.qa-bak src/a.ts -Force',
     'Remove-Item src/a.ts.qa-bak', 'echo digit -C x', 'Select-String -Path src -Pattern config',
     'npm --version',
+    'git branch nueva', 'git branch --merged main', 'npm run release -- --dry-run',
   ]) {
     assert.notEqual(run(command), 'deny', command);
   }
@@ -274,6 +281,8 @@ test('canonicalCommand normaliza ejecutables y opciones globales de git', () => 
   assert.equal(canonicalCommand('git status'), 'git status');
   assert.equal(canonicalCommand('git commit -c x'), 'git commit -c x');
   assert.equal(canonicalCommand('& "git.exe" push'), '& git push');
+  assert.equal(canonicalCommand('git -C. push'), 'git push');
+  assert.equal(canonicalCommand('git -cuser.name=x push'), 'git push');
 });
 
 test('la copia instalada en .agents/hooks es idéntica a lib/permission-gate.cjs', () => {
@@ -288,6 +297,16 @@ test('la forma canónica nunca sirve para permitir', () => {
     'git.exe status',
     'git --no-pager log',
     '"git" status',
+  ]) {
+    assert.equal(run(command), 'ask', command);
+  }
+});
+
+test('git branch solo se permite para listar', () => {
+  for (const command of [
+    'git branch nueva',
+    'git branch --merged main',
+    'git -C. status',
   ]) {
     assert.equal(run(command), 'ask', command);
   }
