@@ -24,8 +24,8 @@ function test(name, action) {
 
 const relevoBin = path.resolve(__dirname, '..', 'bin', 'relevo.cjs');
 
-function runDoctorCli(repoDir, settingsPath, args = ['--json']) {
-  const env = { ...process.env };
+function runDoctorCli(repoDir, settingsPath, args = ['--json'], extraEnv = {}) {
+  const env = { ...process.env, ...extraEnv };
   if (settingsPath !== undefined) {
     env.RELEVO_AGY_SETTINGS = settingsPath;
   }
@@ -374,6 +374,34 @@ try {
     assert.ok(checkClean, 'debe incluir la comprobación agentes');
     assert.equal(checkClean.status, 'ok');
     assert.equal(checkClean.message, 'agentes qa y documentalista en .agents/agents');
+  });
+
+  test('(p) doctor con RELEVO_CODEX_CONFIG hacia archivo vacío: codex da aviso con "aprueba el hook" o ok con "no instalado"', () => {
+    const emptyConfig = path.join(tmpDir, 'codex-empty.toml');
+    fs.writeFileSync(emptyConfig, '', 'utf8');
+    const res = runDoctorCli(repoDir, settingsFile, ['--json'], { RELEVO_CODEX_CONFIG: emptyConfig });
+    const codexCheck = res.parsed.checks.find((c) => c.id === 'codex');
+    assert.ok(codexCheck, 'debe incluir la comprobación codex');
+    if (codexCheck.status === 'aviso') {
+      assert.ok(codexCheck.message.includes('aprueba el hook'), `mensaje inesperado: ${codexCheck.message}`);
+    } else {
+      assert.equal(codexCheck.status, 'ok');
+      assert.ok(codexCheck.message.includes('no instalado'), `mensaje inesperado: ${codexCheck.message}`);
+    }
+  });
+
+  test('(q) doctor con RELEVO_CODEX_CONFIG con la clave correcta: ok o no instalado', () => {
+    const validConfig = path.join(tmpDir, 'codex-valid.toml');
+    const realRepo = fs.realpathSync.native(repoDir);
+    const hookKey = (path.join(realRepo, '.codex', 'config.toml') + ':pre_tool_use:0:0').replace(/\//g, '\\');
+    fs.writeFileSync(validConfig, `[hooks.state.'${hookKey}']\n`, 'utf8');
+    const res = runDoctorCli(repoDir, settingsFile, ['--json'], { RELEVO_CODEX_CONFIG: validConfig });
+    const codexCheck = res.parsed.checks.find((c) => c.id === 'codex');
+    assert.ok(codexCheck, 'debe incluir la comprobación codex');
+    assert.equal(codexCheck.status, 'ok', `status no fue ok, fue ${codexCheck.status}: ${codexCheck.message}`);
+    const isApproved = codexCheck.message.includes('puerta de relevo aprobada en Codex');
+    const isNotInstalled = codexCheck.message.includes('Codex no instalado');
+    assert.ok(isApproved || isNotInstalled, `mensaje inesperado: ${codexCheck.message}`);
   });
 } finally {
   try {

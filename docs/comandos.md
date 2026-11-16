@@ -35,7 +35,7 @@ relevo run --provider agy --role coder --model gemini-3.8-flash-high \
 | `--brief` | Archivo con el encargo. |
 | `--timeout` | Segundos máximos (por defecto 3000). |
 | `--mode`, `--conversation`, `--agent` | Opciones de agy: plan, continuar una conversación, agente concreto. |
-| `--sandbox` | Modo de sandbox de Codex (por defecto `workspace-write`). |
+| `--sandbox` | Modo de sandbox de Codex (por defecto `workspace-write`). Sin la puerta aprobada en Codex (ver `relevo doctor`), solo se admite `read-only`. |
 | `--allow-low-quota` | Lanza aunque el cupo esté por debajo de `quota.min`; exige justificarlo. |
 
 Se ejecuta siempre desde la raíz del repositorio principal, nunca desde un worktree. Cada ejecución guarda en `<runsDir>/<NN>-<tarea>/` el encargo (`brief.md`), los metadatos (`meta.json`, con el cupo antes y después), los eventos del CLI (`events.ndjson`) y `stderr.log`. Con agy, el encargo viaja por stdin (`--input-format stream-json`), así que su longitud no depende del límite de la línea de comandos de Windows.

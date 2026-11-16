@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { ROOT } = require('../lib/runs.cjs');
 
 const failures = [];
 let passed = 0;
@@ -27,11 +28,22 @@ fs.mkdirSync(bypassDir, { recursive: true });
 const encargoEnBypassDir = path.join(bypassDir, 'encargo.md');
 fs.writeFileSync(encargoEnBypassDir, 'x');
 
-function runLauncher(extraArgs) {
+const trustedConfigFile = path.join(os.tmpdir(), 'relevo-codex-trusted.toml');
+const hookKey = (path.join(ROOT, '.codex', 'config.toml') + ':pre_tool_use:0:0').replace(/\//g, '\\');
+fs.writeFileSync(trustedConfigFile, `[hooks.state.'${hookKey}']\n`);
+
+const emptyConfigFile = path.join(os.tmpdir(), 'relevo-codex-empty.toml');
+fs.writeFileSync(emptyConfigFile, '');
+
+function runLauncher(extraArgs, extraEnv = {}) {
   return spawnSync(
     process.execPath,
     [path.resolve(__dirname, '../lib/run.cjs'), '--provider', 'codex', '--cwd', 'no-existe-relevo-xyz', ...extraArgs],
-    { cwd: path.resolve(__dirname, '..'), encoding: 'utf8' }
+    {
+      cwd: path.resolve(__dirname, '..'),
+      env: { ...process.env, RELEVO_CODEX_CONFIG: trustedConfigFile, ...extraEnv },
+      encoding: 'utf8',
+    }
   );
 }
 
@@ -66,9 +78,21 @@ test('(f) --task t --brief <encargo> --sandbox workspace-write', () => {
   assert.ok(res.stderr.includes('--cwd no existe'), `esperaba que stderr contuviera '--cwd no existe', pero fue: ${res.stderr}`);
 });
 
+test('(g) con RELEVO_CODEX_CONFIG hacia un archivo vacío, sin --sandbox: stderr contiene "Codex sin la puerta aprobada"', () => {
+  const res = runLauncher(['--task', 't', '--brief', encargo], { RELEVO_CODEX_CONFIG: emptyConfigFile });
+  assert.ok(res.stderr.includes('Codex sin la puerta aprobada'), `esperaba que stderr contuviera 'Codex sin la puerta aprobada', pero fue: ${res.stderr}`);
+});
+
+test('(h) con RELEVO_CODEX_CONFIG hacia un archivo vacío, con --sandbox read-only: stderr contiene "--cwd no existe"', () => {
+  const res = runLauncher(['--task', 't', '--brief', encargo, '--sandbox', 'read-only'], { RELEVO_CODEX_CONFIG: emptyConfigFile });
+  assert.ok(res.stderr.includes('--cwd no existe'), `esperaba que stderr contuviera '--cwd no existe', pero fue: ${res.stderr}`);
+});
+
 try {
   fs.rmSync(encargo, { force: true });
   fs.rmSync(bypassDir, { recursive: true, force: true });
+  fs.rmSync(trustedConfigFile, { force: true });
+  fs.rmSync(emptyConfigFile, { force: true });
 } catch { /* ignorar */ }
 
 console.log(`\nrun args: ${passed} passed, ${failures.length} failed.`);

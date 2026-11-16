@@ -69,6 +69,8 @@ test('primera ejecución crea todos los archivos; segunda ejecución → todos s
   assert.equal(fs.existsSync(path.join(repo, '.agents/plugins/relevo/plugin.json')), false);
   assert.ok(fs.existsSync(path.join(repo, '.gitignore')));
   assert.ok(fs.existsSync(path.join(repo, '.claude/skills/verificar-cambio/SKILL.md')));
+  assert.ok(fs.existsSync(path.join(repo, '.codex/config.toml')));
+  assert.ok(fs.readFileSync(path.join(repo, '.codex/config.toml'), 'utf8').includes('permission-gate.cjs'));
 
   // Snapshot de contenidos byte a byte
   const snapshots = new Map();

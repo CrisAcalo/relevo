@@ -10,6 +10,7 @@
 | `.claude/skills/` | Skills `delegar-agy`, `verificar-cambio`, `definicion-de-hecho`, `e2e-headless`, `auditar-capturas`. |
 | `.agents/agents/` | Agentes `qa` y `documentalista` (agentes de proyecto de agy; `relevo run` los usa según el rol). |
 | `.agents/hooks/permission-gate.cjs`, `.agents/hooks.json` | Puerta de permisos (hook `PreToolUse` de agy). |
+| `.codex/config.toml` | Hook de Codex que ejecuta la puerta de permisos. Codex solo lo ejecuta tras aprobarlo una vez en Codex interactivo; hasta entonces, relevo solo lanza Codex con `--sandbox read-only`. |
 | `.agents/skills.json` | Registro de las skills para agy. |
 | `.agents/relevo.lock.json` | Hash de cada plantilla instalada; es la base de `relevo update`. |
 | `.gitignore` | `artifacts/agent-runs/`, `.worktrees/`, `.agents/hooks/gate.log`, `.qa-verdict.json`, `artifacts/qa-mutantes/`, `*.relevo-new`. |

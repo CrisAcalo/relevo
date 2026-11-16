@@ -1,0 +1,8 @@
+# Puerta de permisos de relevo para Codex (relevo init).
+# Codex solo la ejecuta si la apruebas una vez: abre codex en este proyecto y aprueba el hook.
+[[hooks.PreToolUse]]
+matcher = ".*"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "node .agents/hooks/permission-gate.cjs"
