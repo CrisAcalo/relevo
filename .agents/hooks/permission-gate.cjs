@@ -243,14 +243,21 @@ function relativeToWorkspace(target, workspaces = [], repoRoot = '', worktreesDi
 function decideEdit(payload, role, roleScopes, repoRoot, worktreesDir, sensitiveRegex) {
   const args = payload.toolCall.args ?? {};
   const target = args.Path ?? args.TargetFile ?? args.AbsolutePath ?? args.FilePath ?? args.File ?? args.path;
-  const relative = relativeToWorkspace(target, payload.workspacePaths, repoRoot, worktreesDir);
-  if (sensitiveRegex.test(relative ?? '') || sensitiveRegex.test(String(target ?? '').replace(/\\/g, '/'))) {
+  const rawTarget = target;
+  // Normaliza "..", "." y separadores sin resolver contra el directorio actual: path.resolve tomaría
+  // "C:/…" por relativa en Linux y lo antepondría el cwd.
+  const normalizedTarget = rawTarget == null ? rawTarget : path.posix.normalize(String(rawTarget).replace(/\\/g, '/'));
+  let relative = relativeToWorkspace(normalizedTarget, payload.workspacePaths, repoRoot, worktreesDir);
+  if (relative && (relative === '..' || relative.startsWith('../') || path.isAbsolute(relative))) {
+    relative = null;
+  }
+  if (sensitiveRegex.test(relative ?? '') || sensitiveRegex.test(String(normalizedTarget ?? '').replace(/\\/g, '/'))) {
     return { decision: 'deny', reason: 'Ruta sensible (.env o perfiles de navegador): no se edita.' };
   }
   const scope = roleScopes[role];
   if (!scope) return { decision: 'ask', reason: 'Edición sin restricción de rol.' };
   if (relative && scope.some((pattern) => pattern.test(relative))) return { decision: 'allow', reason: `Edición dentro del ámbito del rol ${role}.` };
-  return { decision: 'deny', reason: `El rol ${role} no puede modificar ${relative ?? target ?? 'esa ruta'}; repórtalo en tu entrega en lugar de editarlo.` };
+  return { decision: 'deny', reason: `El rol ${role} no puede modificar ${relative ?? normalizedTarget ?? 'esa ruta'}; repórtalo en tu entrega en lugar de editarlo.` };
 }
 
 const GIT_GLOBAL_OPTIONS = /\bgit((?:\s+(?:-C|-c)\s*(?:"[^"]*"|'[^']*'|[^\s"']+)|\s+(?:--git-dir|--work-tree|--namespace|--exec-path|--config-env)(?:=|\s+)(?:"[^"]*"|'[^']*'|[^\s"']+)|\s+(?:--no-pager|--paginate|-p|-P|--bare|--no-replace-objects|--literal-pathspecs|--no-optional-locks))*)(?=\s)/gi;
@@ -366,7 +373,11 @@ function decideCodex(payload, env = process.env, repoRootOverride = null) {
     }
 
     for (const ruta of paths) {
-      const absoluta = path.resolve(payload.cwd ?? process.cwd(), ruta);
+      // Ruta absoluta (POSIX o con unidad de Windows) tal cual; relativa, unida al cwd de Codex. Sin path.resolve
+      // por la misma razón que en decideEdit.
+      const rutaPosix = ruta.replace(/\\/g, '/');
+      const base = String(payload.cwd ?? process.cwd()).replace(/\\/g, '/');
+      const absoluta = /^(?:\/|[A-Za-z]:\/)/.test(rutaPosix) ? path.posix.normalize(rutaPosix) : path.posix.join(base, rutaPosix);
       const res = decide({
         toolCall: { name: 'write_to_file', args: { TargetFile: absoluta } },
         workspacePaths: payload.cwd ? [payload.cwd] : [],

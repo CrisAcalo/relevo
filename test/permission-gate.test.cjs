@@ -626,5 +626,42 @@ test('(cx-mayus)', () => {
   }).decision, 'deny');
 });
 
+test('(dotdot-rol)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  const edit = (role, target) => decide({
+    toolCall: { name: 'write_to_file', args: { TargetFile: target } },
+    workspacePaths: [repo],
+  }, { AGY_ROLE: role }).decision;
+
+  assert.equal(edit('docs', repo + '/docs/../lib/x.cjs'), 'deny');
+  assert.equal(edit('qa', repo + '/artifacts/../lib/x.cjs'), 'deny');
+  assert.equal(edit('docs', repo + '/docs/sub/../a.md'), 'allow');
+  assert.equal(edit('docs', repo + '/docs/a.md'), 'allow');
+});
+
+test('(dotdot-sensible)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  const env = { AGY_ROLE: 'coder' };
+
+  assert.equal(decide({
+    toolCall: { name: 'write_to_file', args: { TargetFile: repo + '/artifacts/sub/../.cache/x' } },
+    workspacePaths: [repo],
+  }, env).decision, 'deny');
+  assert.equal(decide({
+    toolCall: { name: 'write_to_file', args: { TargetFile: repo + '/src/../.env' } },
+    workspacePaths: [repo],
+  }, env).decision, 'deny');
+});
+
+test('(dotdot-codex)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  assert.equal(decideCodex({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'apply_patch',
+    tool_input: { command: '*** Update File: docs/../lib/x.cjs' },
+    cwd: repo,
+  }, { AGY_ROLE: 'docs' }).decision, 'deny');
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
