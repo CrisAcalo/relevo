@@ -28,7 +28,7 @@ relevo run --provider agy --role coder --model gemini-3.8-flash-high \
 | Opción | Descripción |
 |---|---|
 | `--provider` | `agy` o `codex`. |
-| `--role` | `coder`, `qa`, `docs`, `vision`, `research` o `review`; la puerta limita qué archivos puede editar. |
+| `--role` | `coder`, `qa`, `docs`, `vision`, `research` o `review`; la puerta limita qué archivos puede editar. Con agy, los roles `qa` y `docs` usan el agente del proyecto `.agents/agents/qa.md` o `documentalista.md` si existe (`--agent` lo sustituye). |
 | `--model` | Modelo del proveedor. |
 | `--task` | Nombre de la tarea (letras, números y guiones). |
 | `--cwd` | Worktree donde trabaja el agente; debe existir dentro del repositorio. |

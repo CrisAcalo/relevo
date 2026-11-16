@@ -8,7 +8,7 @@
 |---|---|
 | `relevo.config.json` | Configuración del proyecto (ver abajo). |
 | `.claude/skills/` | Skills `delegar-agy`, `verificar-cambio`, `definicion-de-hecho`, `e2e-headless`, `auditar-capturas`. |
-| `.agents/plugins/relevo/` | Agentes `qa` y `documentalista` y `plugin.json`. |
+| `.agents/agents/` | Agentes `qa` y `documentalista` (agentes de proyecto de agy; `relevo run` los usa según el rol). |
 | `.agents/hooks/permission-gate.cjs`, `.agents/hooks.json` | Puerta de permisos (hook `PreToolUse` de agy). |
 | `.agents/skills.json` | Registro de las skills para agy. |
 | `.agents/relevo.lock.json` | Hash de cada plantilla instalada; es la base de `relevo update`. |

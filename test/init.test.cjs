@@ -64,7 +64,9 @@ test('primera ejecución crea todos los archivos; segunda ejecución → todos s
   assert.ok(fs.existsSync(path.join(repo, '.agents/hooks/permission-gate.cjs')));
   assert.ok(fs.existsSync(path.join(repo, '.agents/hooks.json')));
   assert.ok(fs.existsSync(path.join(repo, '.agents/skills.json')));
-  assert.ok(fs.existsSync(path.join(repo, '.agents/plugins/relevo/plugin.json')));
+  assert.ok(fs.existsSync(path.join(repo, '.agents/agents/qa.md')));
+  assert.ok(fs.existsSync(path.join(repo, '.agents/agents/documentalista.md')));
+  assert.equal(fs.existsSync(path.join(repo, '.agents/plugins/relevo/plugin.json')), false);
   assert.ok(fs.existsSync(path.join(repo, '.gitignore')));
   assert.ok(fs.existsSync(path.join(repo, '.claude/skills/verificar-cambio/SKILL.md')));
 

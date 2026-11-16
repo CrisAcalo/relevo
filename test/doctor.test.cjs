@@ -342,6 +342,39 @@ try {
       fs.writeFileSync(lockPath, origLock, 'utf8');
     }
   });
+
+  test('(o) comprobación agentes: aviso si hay .md en plugins, ok tras init limpio', () => {
+    const cleanRepo = path.join(tmpDir, 'repo-agentes-clean');
+    fs.mkdirSync(cleanRepo, { recursive: true });
+    execFileSync('git', ['init'], { cwd: cleanRepo, stdio: 'ignore' });
+    const initRes = spawnSync(process.execPath, [relevoBin, 'init'], {
+      cwd: cleanRepo,
+      encoding: 'utf8',
+    });
+    assert.equal(initRes.status, 0, `init falló: ${initRes.stderr}`);
+
+    // Con un .md en .agents/plugins/relevo/agents/ -> aviso
+    const oldDir = path.join(cleanRepo, '.agents', 'plugins', 'relevo', 'agents');
+    fs.mkdirSync(oldDir, { recursive: true });
+    fs.writeFileSync(path.join(oldDir, 'qa.md'), '# antiguo\n', 'utf8');
+
+    const resAviso = runDoctorCli(cleanRepo, settingsFile, ['--json']);
+    const checkAviso = resAviso.parsed.checks.find((c) => c.id === 'agentes');
+    assert.ok(checkAviso, 'debe incluir la comprobación agentes');
+    assert.equal(checkAviso.status, 'aviso');
+    assert.ok(
+      checkAviso.message.includes('relevo update --apply'),
+      `mensaje debe incluir relevo update --apply: ${checkAviso.message}`
+    );
+
+    // Sin .md en plugins (tras init limpio) -> ok
+    fs.unlinkSync(path.join(oldDir, 'qa.md'));
+    const resClean = runDoctorCli(cleanRepo, settingsFile, ['--json']);
+    const checkClean = resClean.parsed.checks.find((c) => c.id === 'agentes');
+    assert.ok(checkClean, 'debe incluir la comprobación agentes');
+    assert.equal(checkClean.status, 'ok');
+    assert.equal(checkClean.message, 'agentes qa y documentalista en .agents/agents');
+  });
 } finally {
   try {
     fs.rmSync(tmpDir, { recursive: true, force: true });

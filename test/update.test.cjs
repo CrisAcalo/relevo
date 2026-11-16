@@ -75,10 +75,10 @@ test('(b) simula una plantilla nueva con templatesDir → actualizable y --apply
   // Sin apply: se reporta como actualizable pero no se toca
   const resPlan = update({ cwd: repo, templatesDir: tmpTemplates, apply: false, silent: true });
   assert.equal(resPlan.hasError, false);
-  const qaEntryPlan = resPlan.results.find((r) => r.file === '.agents/plugins/relevo/agents/qa.md');
+  const qaEntryPlan = resPlan.results.find((r) => r.file === '.agents/agents/qa.md');
   assert.equal(qaEntryPlan.status, 'actualizable');
 
-  const installedAgent = path.join(repo, '.agents/plugins/relevo/agents/qa.md');
+  const installedAgent = path.join(repo, '.agents/agents/qa.md');
   assert.notEqual(fs.readFileSync(installedAgent, 'utf8'), nuevoContenido);
 
   // Con apply: se actualiza el archivo y el lock
@@ -89,11 +89,11 @@ test('(b) simula una plantilla nueva con templatesDir → actualizable y --apply
   const lockPath = path.join(repo, '.agents/relevo.lock.json');
   const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
   const expectedHash = crypto.createHash('sha256').update(nuevoContenido).digest('hex');
-  assert.equal(lock.files['.agents/plugins/relevo/agents/qa.md'], expectedHash);
+  assert.equal(lock.files['.agents/agents/qa.md'], expectedHash);
 
   // Tras actualizar, una nueva comprobación lo ve "al día"
   const resPost = update({ cwd: repo, templatesDir: tmpTemplates, silent: true });
-  const qaEntryPost = resPost.results.find((r) => r.file === '.agents/plugins/relevo/agents/qa.md');
+  const qaEntryPost = resPost.results.find((r) => r.file === '.agents/agents/qa.md');
   assert.equal(qaEntryPost.status, 'al día');
 });
 
@@ -140,7 +140,7 @@ test('(d) sin lock → "personalizado"', () => {
 
   // Sin lock, cualquier diferencia se trata como "personalizado" por prudencia
   const res = update({ cwd: repo, templatesDir: tmpTemplates, apply: false, silent: true });
-  const entry = res.results.find((r) => r.file === '.agents/plugins/relevo/agents/qa.md');
+  const entry = res.results.find((r) => r.file === '.agents/agents/qa.md');
   assert.equal(entry.status, 'personalizado');
 });
 
@@ -323,6 +323,52 @@ test('(k) puerta modificada + plantilla sin cambios → sigue "error"', () => {
   const resApplyNoForce = update({ cwd: repo, apply: true, force: false, silent: true });
   assert.equal(resApplyNoForce.hasError, true);
   assert.equal(fs.readFileSync(gatePath, 'utf8'), gateModificada);
+});
+
+test('(migración) actualiza agentes antiguos a .agents/agents conservando lo personalizado', () => {
+  const repo = makeRepoWithInit();
+
+  const newQa = path.join(repo, '.agents', 'agents', 'qa.md');
+  const oldDir = path.join(repo, '.agents', 'plugins', 'relevo', 'agents');
+  const oldQa = path.join(oldDir, 'qa.md');
+  fs.mkdirSync(oldDir, { recursive: true });
+
+  const customContent = '# qa personalizado\n';
+  if (fs.existsSync(newQa)) {
+    fs.unlinkSync(newQa);
+  }
+  fs.writeFileSync(oldQa, customContent, 'utf8');
+
+  const lockPath = path.join(repo, '.agents', 'relevo.lock.json');
+  const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  const qaHash = lock.files['.agents/agents/qa.md'] || lock.files['.agents/plugins/relevo/agents/qa.md'];
+  delete lock.files['.agents/agents/qa.md'];
+  lock.files['.agents/plugins/relevo/agents/qa.md'] = qaHash;
+  fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\n', 'utf8');
+
+  // 2. update sin --apply: estado migrado y nada cambia en disco
+  const resPlan = update({ cwd: repo, apply: false, silent: true });
+  const entryPlan = resPlan.results.find((r) => r.file === '.agents/agents/qa.md');
+  assert.ok(entryPlan, 'debe encontrar la entrada .agents/agents/qa.md');
+  assert.equal(entryPlan.status, 'migrado');
+  assert.equal(entryPlan.note, 'desde .agents/plugins/relevo/agents/qa.md');
+  assert.equal(fs.existsSync(newQa), false);
+  assert.equal(fs.existsSync(oldQa), true);
+  assert.equal(fs.readFileSync(oldQa, 'utf8'), customContent);
+
+  // 3. update con --apply: .agents/agents/qa.md contiene '# qa personalizado\n', el antiguo no existe y el registro tiene la clave nueva
+  const resApply = update({ cwd: repo, apply: true, silent: true });
+  const entryApply = resApply.results.find((r) => r.file === '.agents/agents/qa.md');
+  assert.ok(entryApply, 'debe encontrar la entrada .agents/agents/qa.md en apply');
+  assert.equal(entryApply.status, 'migrado');
+  assert.equal(entryApply.note, 'desde .agents/plugins/relevo/agents/qa.md');
+  assert.equal(fs.existsSync(newQa), true);
+  assert.equal(fs.readFileSync(newQa, 'utf8'), customContent);
+  assert.equal(fs.existsSync(oldQa), false);
+
+  const lockUpdated = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  assert.equal(lockUpdated.files['.agents/plugins/relevo/agents/qa.md'], undefined);
+  assert.equal(lockUpdated.files['.agents/agents/qa.md'], qaHash);
 });
 
 // Limpieza general
