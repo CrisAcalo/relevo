@@ -581,5 +581,50 @@ test('(cx-proceso)', () => {
   assert.equal(parsedAgy.decision, 'deny');
 });
 
+test('(sens-edit)', () => {
+  const root = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo/';
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  const env = { AGY_ROLE: 'coder' };
+
+  assert.equal(decide({
+    toolCall: { name: 'write_to_file', args: { TargetFile: root + '.env' } },
+    workspacePaths: [repo],
+  }, env).decision, 'deny');
+
+  const patch = (command) => decideCodex({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'apply_patch',
+    tool_input: { command },
+    cwd: repo,
+  }, env).decision;
+
+  assert.equal(patch('*** Add File: .env'), 'deny');
+  assert.equal(patch('*** Update File: config/.env.local'), 'deny');
+  assert.equal(patch('*** Update File: artifacts/.cache/x'), 'deny');
+  assert.notEqual(patch('*** Update File: src/env.ts'), 'deny');
+
+  // Añadido por el auditor: un .env fuera del repositorio no tiene ruta relativa; lo protege la ruta completa.
+  assert.equal(decide({
+    toolCall: { name: 'write_to_file', args: { TargetFile: 'D:/otro-proyecto/.env' } },
+    workspacePaths: [repo],
+  }, env).decision, 'deny');
+  assert.equal(patch('*** Update File: D:/otro-proyecto/.env'), 'deny');
+});
+
+test('(cx-mayus)', () => {
+  assert.equal(decideCodex({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'BASH',
+    tool_input: { command: 'git push' },
+    cwd: 'C:/Proyectos/Personal/GeneradorMusica',
+  }).decision, 'deny');
+  assert.equal(decideCodex({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'MCP__x',
+    tool_input: {},
+    cwd: 'C:/Proyectos/Personal/GeneradorMusica',
+  }).decision, 'deny');
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
