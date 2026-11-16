@@ -747,5 +747,29 @@ test('(marcador-externo)', () => {
   assert.equal(write('docs/a.md'), 'allow');
 });
 
+test('(cmd-dotdot-delimitadores)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  const env = { AGY_ROLE: 'coder' };
+  const cmd = (command) => decide({
+    toolCall: { name: 'run_command', args: { CommandLine: command } },
+    workspacePaths: [repo],
+  }, env).decision;
+
+  assert.equal(cmd('cat $DIR/../.cache;echo ok'), 'deny');
+  assert.equal(cmd('Get-Content (Join-Path artifacts a)/../.cache|Select-Object -First 1'), 'deny');
+  assert.equal(cmd('cat --file=artifacts/../.cache;echo ok'), 'deny');
+  assert.equal(cmd("cat 'artifacts/mi carpeta'/../.cache;echo ok"), 'deny');
+  assert.equal(cmd('cat ../.env&&echo'), 'deny');
+  assert.equal(cmd('(cat ../.env)'), 'deny');
+
+  assert.notEqual(cmd('cat docs/my.cache.md'), 'deny');
+  assert.notEqual(cmd('cat ../x.envrc'), 'deny');
+  assert.notEqual(cmd('Get-Content src/../README.md;echo ok'), 'deny');
+  // Añadidas por el auditor: controles con .. que fijan los límites de la hoja y del segmento.
+  assert.notEqual(cmd('cat ../my.cache'), 'deny');
+  assert.notEqual(cmd('cat ../.envrc'), 'deny');
+  assert.notEqual(cmd('cat src/a..b/.cache/c'), 'deny');
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;

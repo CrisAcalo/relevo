@@ -174,7 +174,7 @@ function buildNpmRunRegex(npmScripts) {
   return new RegExp(`^npm(?:\\.cmd)?\\s+${body}(\\s+--\\s+[\\w=.\\-:\\s]+)?$`, 'i');
 }
 
-const DOTDOT_SEGMENT = /(?:^|[\s'"`\\/=:(])\.\.(?=[\\/]|$|[\s'"`)])/;
+const DOTDOT_SEGMENT = /(?<![\w.-])\.\.(?![\w.-])/;
 
 function buildSensitivePathsRegex(sensitivePaths) {
   if (!sensitivePaths.length) return /(?!)/;
@@ -191,7 +191,7 @@ function buildSensitiveLeafRegex(sensitivePaths) {
     .filter(Boolean)
     .map((leaf) => leaf.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   if (!leaves.length) return /(?!)/;
-  return new RegExp(`(?:^|[\\s'"\\\\/])(?:${leaves.join('|')})(?=$|[\\s'"\\\\/])`, 'i');
+  return new RegExp(`(?<![\\w.-])(?:${leaves.join('|')})(?![\\w.-])`, 'i');
 }
 
 function buildRoleScopes(roleScopesConfig) {
