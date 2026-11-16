@@ -30,6 +30,9 @@ test('maps models to their quota group', () => {
   assert.equal(quotaGroupForModel('gemini-4-argon-high'), 'argon');
   assert.equal(quotaGroupForModel('claude-sonnet-5-5-low'), 'third-party');
   assert.equal(quotaGroupForModel(undefined), 'gemini');
+  assert.equal(quotaGroupForModel('gemini-pro-orchestrator-g1-pro'), 'argon');
+  assert.equal(quotaGroupForModel('gemini-4-hydrogen-high'), 'gemini');
+  assert.equal(quotaGroupForModel('gemini-3.8-flash-low'), 'gemini');
 });
 
 test('remaining uses the most restrictive window of the group', () => {

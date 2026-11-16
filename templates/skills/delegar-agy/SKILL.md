@@ -11,14 +11,17 @@ Claude planifica, redacta el encargo, audita y hace commit. agy ejecuta. El usua
 
 ## Modelos (solo Google)
 
-| Trabajo | Modelo |
-|---|---|
-| Por defecto para todo, incluido trabajo delicado: código, migraciones, concurrencia, render, tests, QA, docs, capturas | `gemini-3.8-flash-high` |
-| Excepción: Flash High falló dos veces la misma tarea, o diseño crítico del núcleo (determinismo, concurrencia, seguridad) | `gemini-4-argon-medium` (`-high` solo si Argon Medium también falla) |
+| Trabajo | Modelo | Cupo |
+|---|---|---|
+| Implementación (`coder`), documentación, correcciones acotadas, capturas | `gemini-3.8-flash-high` | Gemini |
+| QA independiente, revisión adversarial y tareas delicadas (seguridad, concurrencia, determinismo, persistencia) | `gemini-4-hydrogen-high` | Gemini |
+| Excepción: Hydrogen falló dos veces la misma tarea o diseño crítico del núcleo que no sale | `gemini-4-argon-medium` (`-high` solo si también falla) | Argon |
 
-**Argon tiene un cupo propio, separado y más limitado que Flash**. No usarlo nunca para documentación, QA, capturas, investigación general ni correcciones acotadas. Acotar siempre qué archivos puede leer. Antes de lanzar Argon, decir en el chat por qué Flash no basta.
-
-Nunca `claude-*` ni `gpt-oss-*` dentro de agy.
+- **Hydrogen comparte el cupo de Flash** («Gemini Models»), no el de Argon. En una comparativa real del mismo QA, Hydrogen High encontró un fallo real que Flash High no vio, en menos tiempo (4 min 49 s frente a 6 min 28 s) y con menos tokens (165k frente a 204k).
+- **Argon** (y el Orchestrator, `gemini-pro-orchestrator-g1-pro`, que cuenta en el mismo cupo) tiene un cupo propio, separado y más limitado. Solo con motivo explícito en el chat y acotando qué archivos puede leer.
+- Los niveles `-low` y `-medium` sirven para tareas mecánicas muy acotadas (por ejemplo, consultas de solo lectura).
+- Nunca `claude-*` ni `gpt-oss-*` dentro de agy.
+- `agy models` lista los modelos disponibles; `relevo quota` muestra el cupo de cada grupo.
 
 ## Preparar una tarea de código
 

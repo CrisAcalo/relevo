@@ -5,7 +5,7 @@
 ## Decisión
 
 - Claude Code planifica, redacta encargos precisos, audita de forma independiente y hace commit. Agentes externos (hoy Antigravity CLI `agy` con modelos Google; adaptador Codex preparado) implementan, investigan, ejecutan QA y analizan capturas de interfaz. El usuario interactúa únicamente con Claude Code y no aprueba permisos del agente en bucle.
-- agy usa solo modelos Google: `gemini-3.8-flash-high` por defecto para todo, incluido el trabajo delicado. Argon (`gemini-4-argon-*`) tiene un cupo semanal propio, separado y más limitado: solo si Flash High falla dos veces la misma tarea o para diseño crítico del núcleo, justificándolo antes en el chat y acotando los archivos que puede leer. No usar modelos Claude ni GPT dentro de agy.
+- agy usa solo modelos Google. `gemini-3.8-flash-high` para implementar, documentar y corregir; `gemini-4-hydrogen-high` para QA independiente y tareas delicadas, porque comparte el cupo de Flash y en una comparativa real del mismo QA encontró un fallo que Flash no vio, en menos tiempo y con menos tokens (2026-11-15). Argon (`gemini-4-argon-*` y el Orchestrator, que cuenta en su cupo) tiene un cupo propio, separado y más limitado: solo si Hydrogen falla dos veces la misma tarea o para diseño crítico del núcleo, justificándolo antes en el chat y acotando qué archivos puede leer. No usar modelos Claude ni GPT dentro de agy.
 - Las capturas de interfaz se analizan con un agente en rol `vision` (skill `auditar-capturas`), no en la ventana de contexto de Claude.
 
 ## Por qué
