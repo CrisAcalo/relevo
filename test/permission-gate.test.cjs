@@ -663,5 +663,44 @@ test('(dotdot-codex)', () => {
   }, { AGY_ROLE: 'docs' }).decision, 'deny');
 });
 
+test('(cmd-dotdot-sensible)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  const env = { AGY_ROLE: 'coder' };
+  const cmd = (command) => decide({
+    toolCall: { name: 'run_command', args: { CommandLine: command } },
+    workspacePaths: [repo],
+  }, env).decision;
+
+  assert.equal(cmd('Get-Content artifacts/./.cache/c.txt'), 'deny');
+  assert.equal(cmd('Get-Content artifacts/x/../.cache/c.txt'), 'deny');
+  assert.equal(cmd(String.raw`Get-Content "artifacts\x\..\.cache\c.txt"`), 'deny');
+  assert.equal(cmd('Get-Content src/../.env'), 'deny');
+  assert.notEqual(cmd('Get-Content src/app.js'), 'deny');
+});
+
+test('(codex-dotdot-sensible)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  assert.equal(decideCodex({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'cat artifacts/x/../.cache/c.txt' },
+    cwd: repo,
+  }, { AGY_ROLE: 'coder' }).decision, 'deny');
+});
+
+test('(marcador-externo)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  const nombre = path.basename(path.resolve(path.dirname(gatePath), '../..'));
+  const write = (target) => decide({
+    toolCall: { name: 'write_to_file', args: { TargetFile: target } },
+    workspacePaths: [repo],
+  }, { AGY_ROLE: 'docs' }).decision;
+
+  assert.equal(write('D:/x/' + nombre + '/docs/a.md'), 'deny');
+  assert.equal(write('../../../' + nombre + '/docs/a.md'), 'deny');
+  assert.equal(write(repo + '/docs/a.md'), 'allow');
+  assert.equal(write('docs/a.md'), 'allow');
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
