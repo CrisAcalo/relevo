@@ -394,7 +394,7 @@ try {
     const validConfig = path.join(tmpDir, 'codex-valid.toml');
     const realRepo = fs.realpathSync.native(repoDir);
     const hookKey = (path.join(realRepo, '.codex', 'config.toml') + ':pre_tool_use:0:0').replace(/\//g, '\\');
-    fs.writeFileSync(validConfig, `[hooks.state.'${hookKey}']\n`, 'utf8');
+    fs.writeFileSync(validConfig, `[hooks.state.'${hookKey}']\ntrusted_hash = "abc"\n`, 'utf8');
     const res = runDoctorCli(repoDir, settingsFile, ['--json'], { RELEVO_CODEX_CONFIG: validConfig });
     const codexCheck = res.parsed.checks.find((c) => c.id === 'codex');
     assert.ok(codexCheck, 'debe incluir la comprobación codex');

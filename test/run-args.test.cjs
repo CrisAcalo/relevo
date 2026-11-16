@@ -28,9 +28,17 @@ fs.mkdirSync(bypassDir, { recursive: true });
 const encargoEnBypassDir = path.join(bypassDir, 'encargo.md');
 fs.writeFileSync(encargoEnBypassDir, 'x');
 
+const codexDir = path.join(ROOT, '.codex');
+const codexFile = path.join(codexDir, 'config.toml');
+const hadCodexFile = fs.existsSync(codexFile);
+if (!hadCodexFile) {
+  fs.mkdirSync(codexDir, { recursive: true });
+  fs.writeFileSync(codexFile, '[[hooks.PreToolUse]]\nmatcher = ".*"\n\n[[hooks.PreToolUse.hooks]]\ntype = "command"\ncommand = "node .agents/hooks/permission-gate.cjs"\n', 'utf8');
+}
+
 const trustedConfigFile = path.join(os.tmpdir(), 'relevo-codex-trusted.toml');
 const hookKey = (path.join(ROOT, '.codex', 'config.toml') + ':pre_tool_use:0:0').replace(/\//g, '\\');
-fs.writeFileSync(trustedConfigFile, `[hooks.state.'${hookKey}']\n`);
+fs.writeFileSync(trustedConfigFile, `[hooks.state.'${hookKey}']\ntrusted_hash = "abc"\n`);
 
 const emptyConfigFile = path.join(os.tmpdir(), 'relevo-codex-empty.toml');
 fs.writeFileSync(emptyConfigFile, '');
@@ -78,9 +86,9 @@ test('(f) --task t --brief <encargo> --sandbox workspace-write', () => {
   assert.ok(res.stderr.includes('--cwd no existe'), `esperaba que stderr contuviera '--cwd no existe', pero fue: ${res.stderr}`);
 });
 
-test('(g) con RELEVO_CODEX_CONFIG hacia un archivo vacío, sin --sandbox: stderr contiene "Codex sin la puerta aprobada"', () => {
+test('(g) con RELEVO_CODEX_CONFIG hacia un archivo vacío, sin --sandbox: stderr contiene "Codex sin la puerta de relevo aprobada"', () => {
   const res = runLauncher(['--task', 't', '--brief', encargo], { RELEVO_CODEX_CONFIG: emptyConfigFile });
-  assert.ok(res.stderr.includes('Codex sin la puerta aprobada'), `esperaba que stderr contuviera 'Codex sin la puerta aprobada', pero fue: ${res.stderr}`);
+  assert.ok(res.stderr.includes('Codex sin la puerta de relevo aprobada'), `esperaba que stderr contuviera 'Codex sin la puerta de relevo aprobada', pero fue: ${res.stderr}`);
 });
 
 test('(h) con RELEVO_CODEX_CONFIG hacia un archivo vacío, con --sandbox read-only: stderr contiene "--cwd no existe"', () => {
@@ -93,6 +101,10 @@ try {
   fs.rmSync(bypassDir, { recursive: true, force: true });
   fs.rmSync(trustedConfigFile, { force: true });
   fs.rmSync(emptyConfigFile, { force: true });
+  if (!hadCodexFile) {
+    fs.rmSync(codexFile, { force: true });
+    try { fs.rmdirSync(codexDir); } catch {}
+  }
 } catch { /* ignorar */ }
 
 console.log(`\nrun args: ${passed} passed, ${failures.length} failed.`);
