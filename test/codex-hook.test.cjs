@@ -198,6 +198,91 @@ try {
     assert.equal(status.trusted, true);
   });
 
+  test('trusted da false con trusted_hash = ""', () => {
+    const repoRoot = path.join(tmpDir, 'repo-hash-empty');
+    fs.mkdirSync(path.join(repoRoot, '.codex'), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, '.codex', 'config.toml'), 'command = "node .agents/hooks/permission-gate.cjs"\n', 'utf8');
+
+    const hookKey = (path.join(repoRoot, '.codex', 'config.toml') + ':pre_tool_use:0:0').replace(/\//g, '\\');
+    const fakeUserConfig = path.join(tmpDir, 'user-config-hash-empty.toml');
+    fs.writeFileSync(
+      fakeUserConfig,
+      `[hooks.state.'${hookKey}']\ntrusted_hash = ""\n`,
+      'utf8'
+    );
+
+    const status = codexHookStatus(repoRoot, { RELEVO_CODEX_CONFIG: fakeUserConfig });
+    assert.equal(status.trusted, false);
+  });
+
+  test('trusted da false con trusted_hash_old = "abc"', () => {
+    const repoRoot = path.join(tmpDir, 'repo-hash-old');
+    fs.mkdirSync(path.join(repoRoot, '.codex'), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, '.codex', 'config.toml'), 'command = "node .agents/hooks/permission-gate.cjs"\n', 'utf8');
+
+    const hookKey = (path.join(repoRoot, '.codex', 'config.toml') + ':pre_tool_use:0:0').replace(/\//g, '\\');
+    const fakeUserConfig = path.join(tmpDir, 'user-config-hash-old.toml');
+    fs.writeFileSync(
+      fakeUserConfig,
+      `[hooks.state.'${hookKey}']\ntrusted_hash_old = "abc"\n`,
+      'utf8'
+    );
+
+    const status = codexHookStatus(repoRoot, { RELEVO_CODEX_CONFIG: fakeUserConfig });
+    assert.equal(status.trusted, false);
+  });
+
+  test('trusted da false con trusted_hash (sin =)', () => {
+    const repoRoot = path.join(tmpDir, 'repo-hash-no-equal');
+    fs.mkdirSync(path.join(repoRoot, '.codex'), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, '.codex', 'config.toml'), 'command = "node .agents/hooks/permission-gate.cjs"\n', 'utf8');
+
+    const hookKey = (path.join(repoRoot, '.codex', 'config.toml') + ':pre_tool_use:0:0').replace(/\//g, '\\');
+    const fakeUserConfig = path.join(tmpDir, 'user-config-hash-no-equal.toml');
+    fs.writeFileSync(
+      fakeUserConfig,
+      `[hooks.state.'${hookKey}']\ntrusted_hash\n`,
+      'utf8'
+    );
+
+    const status = codexHookStatus(repoRoot, { RELEVO_CODEX_CONFIG: fakeUserConfig });
+    assert.equal(status.trusted, false);
+  });
+
+  test('trusted da true con trusted_hash = "sha256:6dfb"', () => {
+    const repoRoot = path.join(tmpDir, 'repo-hash-valid-double');
+    fs.mkdirSync(path.join(repoRoot, '.codex'), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, '.codex', 'config.toml'), 'command = "node .agents/hooks/permission-gate.cjs"\n', 'utf8');
+
+    const hookKey = (path.join(repoRoot, '.codex', 'config.toml') + ':pre_tool_use:0:0').replace(/\//g, '\\');
+    const fakeUserConfig = path.join(tmpDir, 'user-config-hash-valid-double.toml');
+    fs.writeFileSync(
+      fakeUserConfig,
+      `[hooks.state.'${hookKey}']\ntrusted_hash = "sha256:6dfb"\n`,
+      'utf8'
+    );
+
+    const status = codexHookStatus(repoRoot, { RELEVO_CODEX_CONFIG: fakeUserConfig });
+    assert.equal(status.trusted, true);
+  });
+
+  test("trusted da true con trusted_hash='sha256:6dfb'", () => {
+    const repoRoot = path.join(tmpDir, 'repo-hash-valid-single');
+    fs.mkdirSync(path.join(repoRoot, '.codex'), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, '.codex', 'config.toml'), 'command = "node .agents/hooks/permission-gate.cjs"\n', 'utf8');
+
+    const hookKey = (path.join(repoRoot, '.codex', 'config.toml') + ':pre_tool_use:0:0').replace(/\//g, '\\');
+    const fakeUserConfig = path.join(tmpDir, 'user-config-hash-valid-single.toml');
+    fs.writeFileSync(
+      fakeUserConfig,
+      `[hooks.state.'${hookKey}']\ntrusted_hash='sha256:6dfb'\n`,
+      'utf8'
+    );
+
+    const status = codexHookStatus(repoRoot, { RELEVO_CODEX_CONFIG: fakeUserConfig });
+    assert.equal(status.trusted, true);
+  });
+
   test('installed da false con la línea command de la puerta comentada', () => {
     const repoRoot = path.join(tmpDir, 'repo-commented-command');
     fs.mkdirSync(path.join(repoRoot, '.codex'), { recursive: true });
