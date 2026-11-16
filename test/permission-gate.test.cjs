@@ -688,6 +688,51 @@ test('(codex-dotdot-sensible)', () => {
   }, { AGY_ROLE: 'coder' }).decision, 'deny');
 });
 
+test('(cmd-espacios-sensible)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  const env = { AGY_ROLE: 'coder' };
+  const cmd = (command) => decide({
+    toolCall: { name: 'run_command', args: { CommandLine: command } },
+    workspacePaths: [repo],
+  }, env).decision;
+
+  assert.equal(cmd("cat 'artifacts/mi carpeta/../.cache/c'"), 'deny');
+  assert.equal(cmd('Get-Content "artifacts/mi carpeta/../.cache/c"'), 'deny');
+  assert.equal(cmd(String.raw`cat artifacts/mi\ carpeta/../.cache/c`), 'deny');
+  assert.equal(cmd('Get-Content artifacts/mi` carpeta/../.cache/c'), 'deny');
+  assert.equal(cmd(String.raw`cat "artifacts\mi carpeta\..\.cache\c"`), 'deny');
+});
+
+test('(cmd-dotdot-componente)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  const env = { AGY_ROLE: 'coder' };
+  const cmd = (command) => decide({
+    toolCall: { name: 'run_command', args: { CommandLine: command } },
+    workspacePaths: [repo],
+  }, env).decision;
+
+  assert.equal(cmd('cat src/../x/../.env'), 'deny');
+  assert.equal(cmd(String.raw`type ..\.env`), 'deny');
+  assert.notEqual(cmd('Get-Content src/../README.md'), 'deny');
+  assert.notEqual(cmd('node test/x.cjs'), 'deny');
+  assert.notEqual(cmd('cat docs/cache.md'), 'deny');
+  // Añadidas por el auditor: casos que la normalización por palabras no reconstruye; solo los detiene la regla de .. + hoja.
+  assert.equal(cmd('cat $(echo artifacts/x)/../.cache/c'), 'deny');
+  assert.equal(cmd('Get-Content (Join-Path artifacts x)/../.cache/c'), 'deny');
+  // Sin .. no se aplica: una carpeta .cache cualquiera no es sensible.
+  assert.notEqual(cmd('Get-Content src/.cache/c'), 'deny');
+});
+
+test('(codex-espacios-sensible)', () => {
+  const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
+  assert.equal(decideCodex({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: "cat 'artifacts/mi carpeta/../.cache/c'" },
+    cwd: repo,
+  }, { AGY_ROLE: 'coder' }).decision, 'deny');
+});
+
 test('(marcador-externo)', () => {
   const repo = 'C:/Proyectos/Personal/GeneradorMusica/.worktrees/demo';
   const nombre = path.basename(path.resolve(path.dirname(gatePath), '../..'));
