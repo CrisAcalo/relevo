@@ -338,6 +338,51 @@ function decide(payload, env = process.env, repoRootOverride = null) {
     : { decision: 'ask', reason: 'Comando fuera de la lista segura.' };
 }
 
+function decideCodex(payload, env = process.env, repoRootOverride = null) {
+  const toolName = payload?.tool_name;
+  if (toolName === 'Bash') {
+    return decide({
+      toolCall: {
+        name: 'run_command',
+        args: { CommandLine: String(payload.tool_input?.command ?? '') },
+      },
+      workspacePaths: payload.cwd ? [payload.cwd] : [],
+    }, env, repoRootOverride);
+  }
+
+  if (toolName === 'apply_patch') {
+    const text = String(payload.tool_input?.command ?? '');
+    const r1 = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm;
+    const r2 = /^\*\*\* Move to: (.+)$/gm;
+    const matches = [...text.matchAll(r1), ...text.matchAll(r2)].sort((a, b) => a.index - b.index);
+    const paths = matches.map((m) => m[1].trim());
+
+    if (!paths.length) {
+      return { decision: 'deny', reason: 'Parche de Codex sin rutas reconocibles.' };
+    }
+
+    for (const ruta of paths) {
+      const absoluta = path.resolve(payload.cwd ?? process.cwd(), ruta);
+      const res = decide({
+        toolCall: { name: 'write_to_file', args: { TargetFile: absoluta } },
+        workspacePaths: payload.cwd ? [payload.cwd] : [],
+      }, env, repoRootOverride);
+      if (res.decision === 'deny') return res;
+    }
+
+    return { decision: 'ask', reason: 'Edición de Codex dentro del ámbito.' };
+  }
+
+  if (typeof toolName === 'string' && toolName.startsWith('mcp__')) {
+    return {
+      decision: 'deny',
+      reason: 'Herramientas MCP deshabilitadas para agentes de relevo (sin control del escritorio ni navegadores): usa los comandos del proyecto.',
+    };
+  }
+
+  return { decision: 'ask', reason: 'Herramienta de Codex no cubierta por la política.' };
+}
+
 if (require.main === module) {
   let input = '';
   process.stdin.setEncoding('utf8');
@@ -345,20 +390,58 @@ if (require.main === module) {
   process.stdin.on('end', () => {
     let result;
     let payload = {};
-    try { payload = JSON.parse(input || '{}'); result = decide(payload); }
-    catch { result = { decision: 'ask', reason: 'No se pudo interpretar la petición.' }; }
+    let isCodex = false;
+    try {
+      payload = JSON.parse(input || '{}');
+      isCodex = payload.hook_event_name === 'PreToolUse' && typeof payload.tool_name === 'string';
+      result = isCodex ? decideCodex(payload) : decide(payload);
+    } catch {
+      result = { decision: 'ask', reason: 'No se pudo interpretar la petición.' };
+    }
+
     if (process.env.AGY_GATE_LOG !== '0') {
       try {
-        require('node:fs').appendFileSync(require('node:path').join(__dirname, 'gate.log'), JSON.stringify({
-          at: new Date().toISOString(), conversation: payload.conversationId, role: process.env.AGY_ROLE ?? null, tool: payload.toolCall?.name,
-          command: payload.toolCall?.args?.CommandLine ?? payload.toolCall?.args?.Path ?? payload.toolCall?.args?.TargetFile, decision: result.decision,
-        }) + '\n');
+        const logEntry = isCodex
+          ? {
+              at: new Date().toISOString(),
+              provider: 'codex',
+              conversation: payload.session_id,
+              role: process.env.AGY_ROLE ?? null,
+              tool: payload.tool_name,
+              command: payload.tool_input?.command ?? payload.tool_input?.code,
+              decision: result.decision,
+            }
+          : {
+              at: new Date().toISOString(),
+              provider: 'agy',
+              conversation: payload.conversationId,
+              role: process.env.AGY_ROLE ?? null,
+              tool: payload.toolCall?.name,
+              command: payload.toolCall?.args?.CommandLine ?? payload.toolCall?.args?.Path ?? payload.toolCall?.args?.TargetFile,
+              decision: result.decision,
+            };
+        require('node:fs').appendFileSync(require('node:path').join(__dirname, 'gate.log'), JSON.stringify(logEntry) + '\n');
       } catch { /* Logging must never change the decision. */ }
     }
-    process.stdout.write(JSON.stringify(result));
+
+    if (isCodex) {
+      if (result.decision === 'deny') {
+        process.stdout.write(JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: result.reason,
+          },
+        }));
+      } else {
+        process.stdout.write('{}');
+      }
+    } else {
+      process.stdout.write(JSON.stringify(result));
+    }
   });
 }
 
 const ROLE_SCOPES = buildRoleScopes(DEFAULTS_GATE.roleScopes);
 
-module.exports = { decide, ROLE_SCOPES, DEFAULTS_GATE, canonicalCommand };
+module.exports = { decide, decideCodex, ROLE_SCOPES, DEFAULTS_GATE, canonicalCommand };

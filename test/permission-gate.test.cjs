@@ -6,7 +6,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const gatePath = path.resolve(__dirname, '../lib/permission-gate.cjs');
-const { decide, DEFAULTS_GATE, canonicalCommand } = require(gatePath);
+const { decide, decideCodex, DEFAULTS_GATE, canonicalCommand } = require(gatePath);
 const { DEFAULTS } = require('../lib/config.cjs');
 const B = String.fromCharCode(92);
 // Entorno explícito: la prueba no debe depender del AGY_ROLE del proceso que la ejecuta (p. ej. un agente con rol qa).
@@ -496,6 +496,89 @@ test('Start-Process y sus alias se deniegan; npm start y nombres parecidos no', 
   }
   assert.equal(run('Start-Job { git push }'), 'deny');
   assert.equal(run('Start-Job -ScriptBlock { npm.cmd install x }'), 'deny');
+});
+
+const codex = (toolName, toolInput, env = {}) => decideCodex({
+  hook_event_name: 'PreToolUse',
+  tool_name: toolName,
+  tool_input: toolInput,
+  cwd: 'C:/Proyectos/Personal/GeneradorMusica',
+}, env).decision;
+
+test('(cx-bash)', () => {
+  assert.equal(codex('Bash', { command: 'git push' }), 'deny');
+  assert.equal(codex('Bash', { command: 'npm.cmd install x' }), 'deny');
+  assert.equal(codex('Bash', { command: 'Start-Process git push' }), 'deny');
+  assert.equal(codex('Bash', { command: 'git status' }), 'allow');
+});
+
+test('(cx-patch)', () => {
+  const env = { AGY_ROLE: 'docs' };
+  assert.notEqual(codex('apply_patch', {
+    command: '*** Begin Patch\n*** Update File: docs/a.md\n@@\n-x\n+y\n*** End Patch',
+  }, env), 'deny');
+  assert.equal(codex('apply_patch', {
+    command: '*** Begin Patch\n*** Add File: lib/x.cjs\n+1\n*** End Patch',
+  }, env), 'deny');
+  assert.equal(codex('apply_patch', {
+    command: '*** Begin Patch\n*** Update File: docs/a.md\n*** Move to: lib/y.cjs\n*** End Patch',
+  }, env), 'deny');
+  assert.equal(codex('apply_patch', {
+    command: '*** Begin Patch\n*** End Patch',
+  }, env), 'deny');
+  assert.notEqual(codex('apply_patch', {
+    command: '*** Begin Patch\n*** Add File: lib/x.cjs\n+1\n*** End Patch',
+  }, { AGY_ROLE: 'coder' }), 'deny');
+});
+
+test('(cx-mcp)', () => {
+  assert.equal(codex('mcp__cua_repl__js', { code: 'x' }), 'deny');
+  assert.equal(codex('WebSearch', {}), 'ask');
+});
+
+test('(cx-proceso)', () => {
+  const payloadCodexDeGitPush = {
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'git push' },
+    cwd: 'C:/Proyectos/Personal/GeneradorMusica',
+  };
+  const env = { ...process.env, AGY_GATE_LOG: '0' };
+  const resPush = spawnSync(process.execPath, [gatePath], {
+    input: JSON.stringify(payloadCodexDeGitPush),
+    env,
+    encoding: 'utf8',
+  });
+  assert.equal(resPush.status, 0);
+  const parsedPush = JSON.parse(resPush.stdout);
+  assert.equal(parsedPush.hookSpecificOutput?.permissionDecision, 'deny');
+  assert.equal(parsedPush.hookSpecificOutput?.hookEventName, 'PreToolUse');
+
+  const payloadCodexDeGitStatus = {
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'git status' },
+    cwd: 'C:/Proyectos/Personal/GeneradorMusica',
+  };
+  const resStatus = spawnSync(process.execPath, [gatePath], {
+    input: JSON.stringify(payloadCodexDeGitStatus),
+    env,
+    encoding: 'utf8',
+  });
+  assert.equal(resStatus.status, 0);
+  assert.equal(resStatus.stdout, '{}');
+
+  const payloadAgy = {
+    toolCall: { name: 'run_command', args: { CommandLine: 'git push' } },
+  };
+  const resAgy = spawnSync(process.execPath, [gatePath], {
+    input: JSON.stringify(payloadAgy),
+    env,
+    encoding: 'utf8',
+  });
+  assert.equal(resAgy.status, 0);
+  const parsedAgy = JSON.parse(resAgy.stdout);
+  assert.equal(parsedAgy.decision, 'deny');
 });
 
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
