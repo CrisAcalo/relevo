@@ -52,7 +52,7 @@ relevo run --provider agy --role coder --model gemini-3.8-flash-high --task <tar
 ```
 *(o `npm run agent:run` si el proyecto define ese alias).*
 
-Roles: `coder`, `qa`, `docs`, `research`, `vision`, `review`. El lanzador rechaza flags que desactiven permisos o sandbox. Proveedores: `agy` (verificado) y `codex` (adaptador preparado, sin validar con una ejecución real; usa `-s workspace-write`). Para otro proveedor, añadir su adaptador en `lib/providers.cjs`; claves de API únicamente por variables de entorno, nunca en el repositorio.
+Roles: `coder`, `qa`, `docs`, `research`, `vision`, `review`. El lanzador rechaza flags que desactiven permisos o sandbox. Proveedores: `agy` y `codex`. Codex solo escribe (`--sandbox workspace-write`) si la puerta de relevo está registrada en `.codex/config.toml` y el usuario la aprobó una vez en Codex (`relevo doctor` lo comprueba); sin aprobación, `relevo run` solo admite `--sandbox read-only`. Para otro proveedor, añadir su adaptador en `lib/providers.cjs`; claves de API únicamente por variables de entorno, nunca en el repositorio.
 
 - Sin `--sandbox` en agy (rompe el `.git` del worktree y el `npm` de entornos bajo gestores de versiones como nvm) y sin `-i` (pide confirmación por carpeta).
 - Lectura/investigación: añadir `--mode plan`. En ese modo agy no puede escribir en el repo y deja informes en `~/.gemini/antigravity-cli/brain/<conversation_id>/`: copiarlos desde ahí, o usar el modo normal si el encargo debe crear un archivo en `artifacts/`.

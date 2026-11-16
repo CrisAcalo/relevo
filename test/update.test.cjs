@@ -371,6 +371,131 @@ test('(migración) actualiza agentes antiguos a .agents/agents conservando lo pe
   assert.equal(lockUpdated.files['.agents/agents/qa.md'], qaHash);
 });
 
+test('(plugin-retirado) proyecto antiguo retira plugin.json original, borra entrada de lock y elimina .agents/plugins vacía', () => {
+  const repo = makeRepoWithInit();
+
+  const agentsDir = path.join(repo, '.agents', 'agents');
+  const oldAgentsDir = path.join(repo, '.agents', 'plugins', 'relevo', 'agents');
+  fs.mkdirSync(oldAgentsDir, { recursive: true });
+
+  const lockPath = path.join(repo, '.agents', 'relevo.lock.json');
+  const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+
+  if (fs.existsSync(agentsDir)) {
+    for (const file of fs.readdirSync(agentsDir)) {
+      const src = path.join(agentsDir, file);
+      const dst = path.join(oldAgentsDir, file);
+      fs.renameSync(src, dst);
+      const newKey = `.agents/agents/${file}`;
+      const oldKey = `.agents/plugins/relevo/agents/${file}`;
+      if (lock.files[newKey]) {
+        lock.files[oldKey] = lock.files[newKey];
+        delete lock.files[newKey];
+      }
+    }
+    fs.rmdirSync(agentsDir);
+  }
+
+  const pluginContent = JSON.stringify({ name: 'relevo' });
+  const pluginRel = '.agents/plugins/relevo/plugin.json';
+  const pluginPath = path.join(repo, pluginRel);
+  fs.writeFileSync(pluginPath, pluginContent, 'utf8');
+  lock.files[pluginRel] = crypto.createHash('sha256').update(pluginContent).digest('hex');
+  fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\n', 'utf8');
+
+  // Plan: muestra retirado y no toca el disco
+  const resPlan = update({ cwd: repo, apply: false, silent: true });
+  assert.equal(resPlan.hasError, false);
+  const pluginEntryPlan = resPlan.results.find((r) => r.file === pluginRel);
+  assert.ok(pluginEntryPlan, 'debe encontrar la entrada de plugin.json en el plan');
+  assert.equal(pluginEntryPlan.status, 'retirado');
+  assert.equal(pluginEntryPlan.note, 'agy ya no usa el plugin de relevo');
+  assert.equal(fs.existsSync(pluginPath), true, 'el plan no debe borrar plugin.json');
+  assert.equal(fs.existsSync(path.join(repo, '.agents', 'plugins')), true);
+
+  // Apply: borra el archivo, la entrada del lock y la carpeta .agents/plugins
+  const resApply = update({ cwd: repo, apply: true, silent: true });
+  assert.equal(resApply.hasError, false);
+  const pluginEntryApply = resApply.results.find((r) => r.file === pluginRel);
+  assert.ok(pluginEntryApply, 'debe encontrar la entrada de plugin.json en apply');
+  assert.equal(pluginEntryApply.status, 'retirado');
+  assert.equal(fs.existsSync(pluginPath), false, 'apply debe borrar plugin.json');
+
+  const lockUpdated = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  assert.equal(lockUpdated.files[pluginRel], undefined, 'debe eliminar plugin.json del lock');
+  assert.equal(fs.existsSync(path.join(repo, '.agents', 'plugins')), false, '.agents/plugins debe desaparecer');
+
+  // Si no existe en disco pero está en el lock, --apply lo retira del lock sin añadir resultado
+  lockUpdated.files[pluginRel] = 'hash-huerfano';
+  fs.writeFileSync(lockPath, JSON.stringify(lockUpdated, null, 2) + '\n', 'utf8');
+  const resOrphan = update({ cwd: repo, apply: true, silent: true });
+  assert.equal(resOrphan.results.some((r) => r.file === pluginRel), false);
+  const lockCleaned = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  assert.equal(lockCleaned.files[pluginRel], undefined);
+});
+
+test('(plugin-personalizado) plugin.json con clave extra y hash distinto del lock se conserva como personalizado', () => {
+  const repo = makeRepoWithInit();
+
+  const pluginRel = '.agents/plugins/relevo/plugin.json';
+  const pluginPath = path.join(repo, pluginRel);
+  fs.mkdirSync(path.dirname(pluginPath), { recursive: true });
+
+  const customContent = JSON.stringify({ name: 'relevo', extra: 'valor-personalizado' }, null, 2);
+  fs.writeFileSync(pluginPath, customContent, 'utf8');
+
+  const lockPath = path.join(repo, '.agents', 'relevo.lock.json');
+  const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  lock.files[pluginRel] = 'hash-antiguo-distinto';
+  fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\n', 'utf8');
+
+  // Sin apply: resultado es personalizado
+  const resPlan = update({ cwd: repo, apply: false, silent: true });
+  const entryPlan = resPlan.results.find((r) => r.file === pluginRel);
+  assert.ok(entryPlan);
+  assert.equal(entryPlan.status, 'personalizado');
+  assert.equal(entryPlan.note, 'plugin.json antiguo modificado: revísalo y retíralo a mano');
+
+  // Con apply: lo conserva y no toca nada
+  const resApply = update({ cwd: repo, apply: true, silent: true });
+  const entryApply = resApply.results.find((r) => r.file === pluginRel);
+  assert.ok(entryApply);
+  assert.equal(entryApply.status, 'personalizado');
+  assert.equal(entryApply.note, 'plugin.json antiguo modificado: revísalo y retíralo a mano');
+
+  assert.equal(fs.existsSync(pluginPath), true, 'apply debe conservar plugin.json modificado');
+  assert.equal(fs.readFileSync(pluginPath, 'utf8'), customContent);
+
+  const lockAfter = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  assert.equal(lockAfter.files[pluginRel], 'hash-antiguo-distinto', 'el lock no debe tocarse');
+});
+
+test('(plugin-carpeta-con-otros) si .agents/plugins contiene otros archivos, apply borra relevo pero conserva los otros', () => {
+  const repo = makeRepoWithInit();
+
+  const pluginRel = '.agents/plugins/relevo/plugin.json';
+  const pluginPath = path.join(repo, pluginRel);
+  fs.mkdirSync(path.dirname(pluginPath), { recursive: true });
+  const pluginContent = JSON.stringify({ name: 'relevo' });
+  fs.writeFileSync(pluginPath, pluginContent, 'utf8');
+
+  const otherPath = path.join(repo, '.agents', 'plugins', 'otro', 'x.json');
+  fs.mkdirSync(path.dirname(otherPath), { recursive: true });
+  fs.writeFileSync(otherPath, JSON.stringify({ custom: true }), 'utf8');
+
+  const lockPath = path.join(repo, '.agents', 'relevo.lock.json');
+  const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+  lock.files[pluginRel] = crypto.createHash('sha256').update(pluginContent).digest('hex');
+  fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\n', 'utf8');
+
+  const resApply = update({ cwd: repo, apply: true, silent: true });
+  assert.equal(resApply.hasError, false);
+
+  assert.equal(fs.existsSync(otherPath), true, 'el archivo ajeno debe seguir existiendo');
+  assert.equal(fs.existsSync(path.join(repo, '.agents', 'plugins', 'relevo')), false, '.agents/plugins/relevo debe desaparecer');
+  assert.equal(fs.existsSync(path.join(repo, '.agents', 'plugins')), true, '.agents/plugins debe seguir existiendo');
+});
+
 // Limpieza general
 try {
   fs.rmSync(tmpBase, { recursive: true, force: true });
