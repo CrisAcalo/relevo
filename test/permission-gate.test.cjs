@@ -919,5 +919,51 @@ test('la puerta divide los segmentos en \\r solo con gate.commands', () => {
   fs.rmSync(tempRepo, { recursive: true, force: true });
 });
 
+const nuevasPruebasGateSeparadores = [
+  ['cat README.md\nstart notepad.exe', 'deny'],
+  ['cat README.md\rstart calc.exe', 'deny'],
+  ['cat README.md & start notepad.exe', 'deny'],
+  ['chrome.exe & echo --headless', 'deny'],
+  ['chrome.exe\necho --headless', 'deny'],
+  ['chrome.exe\recho --headless', 'deny'],
+  ['git status\ngit push', 'deny'],
+  ['cat x\nnpm install y', 'deny'],
+  ['cat (Remove-Item lib/x.cjs)', 'ask'],
+  ['cat @(Remove-Item lib/x.cjs)', 'ask'],
+  ['Get-Content (Join-Path docs x.md)', 'ask'],
+  ['(Get-Location).Path', 'allow'],
+  ['git status\ngit diff', 'allow'],
+  ['npm test', 'allow'],
+  // Prueba del auditor: solo la forma canónica del segmento (sin .exe/.cmd) revela el alias start.
+  ['cat x\nstart.exe calc', 'deny'],
+  ['cat x\nSTART.cmd calc', 'deny'],
+];
+
+for (const [command, expected] of nuevasPruebasGateSeparadores) {
+  test(`(gate-separadores) ${command.replace(/\r/g, '\\r').replace(/\n/g, '\\n')} -> ${expected}`, () => {
+    assert.equal(run(command), expected);
+  });
+}
+
+test('(gate-separadores) chrome.exe --headless --dump-dom x -> not deny', () => {
+  assert.notEqual(run('chrome.exe --headless --dump-dom x'), 'deny');
+});
+
+const pruebasSubexpresiones = [
+  ['cat a,(Remove-Item b)', 'ask'],
+  ['cat x=(Remove-Item b)', 'ask'],
+  ['echo [(Remove-Item b)]', 'ask'],
+  ['cat x;(Remove-Item b)', 'ask'],
+  ['cat foo(1).txt', 'allow'],
+  ['git log --format=%H(x)', 'allow'],
+  ['(Get-Location).Path', 'allow'],
+];
+
+for (const [command, expected] of pruebasSubexpresiones) {
+  test(`(subexpresiones) ${command} -> ${expected}`, () => {
+    assert.equal(run(command), expected);
+  });
+}
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
