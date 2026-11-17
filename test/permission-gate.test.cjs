@@ -771,5 +771,103 @@ test('(cmd-dotdot-delimitadores)', () => {
   assert.notEqual(cmd('cat src/a..b/.cache/c'), 'deny');
 });
 
+test('gate.commands: prefijos de comandos permitidos y rechazo de valores inválidos', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-commands-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  // Sin configuración, go test ./... queda en ask.
+  const sinConfig = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'go test ./...' } } }, {});
+  assert.equal(sinConfig.decision, 'ask');
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+    gate: { commands: ['go test', 'go vet', 'go -C servidor test'] },
+  }));
+
+  const cases = [
+    ['go test ./...', 'allow'],
+    ['go vet ./internal/...', 'allow'],
+    ['go -C servidor test ./...', 'allow'],
+    ['GO TEST ./...', 'allow'],
+    ['go run .', 'ask'],
+    ['go get x', 'ask'],
+    ['go', 'ask'],
+    ['go testx', 'ask'],
+    ['go -C otra test ./...', 'ask'],
+    ['go test ./... ; go run .', 'ask'],
+    ['go test ./... && git push', 'deny'],
+    ['go test ./... > salida.txt', 'ask'],
+    ['go test ./... ; cat .env', 'deny'],
+  ];
+
+  for (const [command, expected] of cases) {
+    const res = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: command } } }, {});
+    assert.equal(res.decision, expected, `Esperaba ${expected} para "${command}" pero fue ${res.decision}`);
+  }
+
+  const invalidCommands = [
+    ['go'],
+    ['go test; rm x'],
+    ['go $(x)'],
+    [''],
+    [5],
+    'go test',
+  ];
+
+  for (const invalid of invalidCommands) {
+    fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+      gate: { commands: invalid },
+    }));
+    const res = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: 'git status' } } }, {});
+    assert.equal(res.decision, 'deny', `Esperaba deny para git status con commands=${JSON.stringify(invalid)}`);
+    assert.ok(res.reason.includes('gate.commands'), `La razón debe nombrar gate.commands: "${res.reason}"`);
+  }
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
+test('la puerta divide los segmentos también en & solo y en saltos de línea', () => {
+  const cases = [
+    ['cat README.md & Remove-Item lib/x.cjs', 'ask'],
+    ["cat README.md\nRemove-Item lib/x.cjs", 'ask'],
+    ["cat README.md\r\nRemove-Item lib/x.cjs", 'ask'],
+    ['cat README.md & git status', 'allow'],
+    ["cat README.md\ngit status", 'allow'],
+  ];
+
+  for (const [command, expected] of cases) {
+    const res = run(command);
+    assert.equal(res, expected, `Esperaba ${expected} para "${command.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}" pero fue ${res}`);
+  }
+});
+
+test('la puerta divide los segmentos en & solo y en saltos de línea con gate.commands', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-commands-segments-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+    gate: { commands: ['go test'] },
+  }));
+
+  const cases = [
+    ['go test ./... & Remove-Item x', 'ask'],
+    ["go test ./...\nRemove-Item x", 'ask'],
+  ];
+
+  for (const [command, expected] of cases) {
+    const res = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: command } } }, {});
+    assert.equal(res.decision, expected, `Esperaba ${expected} para "${command.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}" pero fue ${res.decision}`);
+  }
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;

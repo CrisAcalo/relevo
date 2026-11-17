@@ -18,6 +18,7 @@ const path = require('node:path');
 const DEFAULTS_GATE = Object.freeze({
   scriptsDirs: Object.freeze(['scripts']),
   npmScripts: Object.freeze(['check', 'verify', 'build', 'dev', 'preview', 'test', 'test:*', 'check:*']),
+  commands: Object.freeze([]),
   sensitivePaths: Object.freeze(['.env', 'artifacts/.cache']),
   roleScopes: Object.freeze({
     docs: Object.freeze(['^docs/', '^AGENTS\\.md$', '^CONTRIBUTING\\.md$', '^README\\.md$']),
@@ -100,6 +101,19 @@ function loadGateConfig(repoRoot) {
         throw new Error('gate.npmScripts debe ser una lista de textos');
       }
     }
+    if (userGate.commands !== undefined) {
+      if (!Array.isArray(userGate.commands) || !userGate.commands.every((s) => typeof s === 'string')) {
+        throw new Error('gate.commands debe ser una lista de textos');
+      }
+      const FORBIDDEN_COMMAND_CHARS = /[;&|<>`$()"'\r\n]/;
+      for (const cmd of userGate.commands) {
+        const trimmed = cmd.trim();
+        const words = trimmed ? trimmed.split(/\s+/) : [];
+        if (!trimmed || words.length < 2 || FORBIDDEN_COMMAND_CHARS.test(trimmed)) {
+          throw new Error(`gate.commands contiene una entrada inválida "${cmd}"`);
+        }
+      }
+    }
     if (userGate.sensitivePaths !== undefined) {
       if (!Array.isArray(userGate.sensitivePaths) || !userGate.sensitivePaths.every((s) => typeof s === 'string')) {
         throw new Error('gate.sensitivePaths debe ser una lista de textos');
@@ -127,6 +141,7 @@ function loadGateConfig(repoRoot) {
     gate = {
       scriptsDirs: Array.isArray(userGate.scriptsDirs) ? userGate.scriptsDirs : DEFAULTS_GATE.scriptsDirs,
       npmScripts: Array.isArray(userGate.npmScripts) ? userGate.npmScripts : DEFAULTS_GATE.npmScripts,
+      commands: Array.isArray(userGate.commands) ? userGate.commands : DEFAULTS_GATE.commands,
       sensitivePaths: Array.isArray(userGate.sensitivePaths) ? userGate.sensitivePaths : DEFAULTS_GATE.sensitivePaths,
       roleScopes: mergeRoleScopes(DEFAULTS_GATE.roleScopes, userGate.roleScopes),
     };
@@ -172,6 +187,20 @@ function buildNpmRunRegex(npmScripts) {
   }
   const body = parts.length > 1 ? `(?:${parts.join('|')})` : parts[0] || 'run\\s+[\\w:\\-]+';
   return new RegExp(`^npm(?:\\.cmd)?\\s+${body}(\\s+--\\s+[\\w=.\\-:\\s]+)?$`, 'i');
+}
+
+function buildAllowedCommands(commands) {
+  return (commands || []).map((entry) => entry.trim().toLowerCase().split(/\s+/));
+}
+
+function matchesCommandPrefix(segmentWords, allowedCommands) {
+  return allowedCommands.some((prefix) => {
+    if (segmentWords.length < prefix.length) return false;
+    for (let i = 0; i < prefix.length; i++) {
+      if (segmentWords[i] !== prefix[i]) return false;
+    }
+    return true;
+  });
 }
 
 const DOTDOT_SEGMENT = /(?<![\w.-])\.\.(?![\w.-])/;
@@ -304,6 +333,7 @@ function decide(payload, env = process.env, repoRootOverride = null) {
   const { gate, worktreesDir } = loaded;
   const nodeScriptRegex = buildNodeScriptRegex(gate.scriptsDirs);
   const npmRunRegex = buildNpmRunRegex(gate.npmScripts);
+  const allowedCommands = buildAllowedCommands(gate.commands);
   const sensitiveRegex = buildSensitivePathsRegex(gate.sensitivePaths);
   const sensitiveLeafRegex = buildSensitiveLeafRegex(gate.sensitivePaths);
   const roleScopes = buildRoleScopes(gate.roleScopes);
@@ -366,10 +396,11 @@ function decide(payload, env = process.env, repoRootOverride = null) {
     }
   }
 
-  const segments = command.split(/\s*(?:\|\||&&|;|\|)\s*/).filter(Boolean);
+  const segments = command.split(/\s*(?:\|\||&&|;|\||&|\r?\n)\s*/).filter(Boolean);
   const safe = segments.every((segment) => {
     const word = segment.split(/\s+/)[0].toLowerCase().replace(/^\((get-location|get-item)\)\.\w+$/, '$1');
-    return READ_ONLY.has(word) || GIT_READ.test(segment) || nodeScriptRegex.test(segment) || npmRunRegex.test(segment);
+    const segmentWords = segment.trim().toLowerCase().split(/\s+/);
+    return READ_ONLY.has(word) || GIT_READ.test(segment) || nodeScriptRegex.test(segment) || npmRunRegex.test(segment) || matchesCommandPrefix(segmentWords, allowedCommands);
   });
 
   return safe

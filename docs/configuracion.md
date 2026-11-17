@@ -33,6 +33,7 @@ Todas las claves son opcionales.
 | `quota.warn` | Cupo que genera aviso | `0.3` |
 | `gate.scriptsDirs` | Carpetas de scripts que los agentes pueden ejecutar con `node` | `["scripts"]` |
 | `gate.npmScripts` | Scripts npm permitidos (`*` como comodín final) | `check`, `verify`, `build`, `dev`, `preview`, `test`, `test:*`, `check:*` |
+| `gate.commands` | Prefijos de comandos permitidos (programa y subcomando, mín. 2 palabras) | `[]` |
 | `gate.sensitivePaths` | Rutas protegidas | `.env`, `artifacts/.cache` |
 | `gate.roleScopes` | Expresiones regulares de rutas editables por rol. Se combina por rol con los valores por defecto: un rol que defines sustituye solo la lista de ese rol; `null` quita la restricción de ese rol y `[]` no le permite editar nada. Un rol sin entrada (como `coder`) no tiene restricción | ver abajo |
 | `check.baseBranch` | Rama base | `main` |

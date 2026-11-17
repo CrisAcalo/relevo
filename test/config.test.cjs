@@ -241,6 +241,30 @@ test('check.testCommand acepta null y ["npm", "test"], y rechaza [], "npm test" 
   }
 });
 
+test('gate.commands: carga válido y rechaza entradas inválidas', () => {
+  const testDir = path.join(tmpBase, 'gate-commands');
+  fs.mkdirSync(testDir, { recursive: true });
+
+  // gate.commands válido se carga
+  fs.writeFileSync(path.join(testDir, 'relevo.config.json'), JSON.stringify({
+    gate: { commands: ['go test', 'go vet'] },
+  }));
+  const config = loadConfig(testDir);
+  assert.deepEqual(config.gate.commands, ['go test', 'go vet']);
+
+  // Una entrada de una sola palabra produce un error que nombra gate.commands
+  assert.throws(
+    () => validateConfig({ ...DEFAULTS, gate: { ...DEFAULTS.gate, commands: ['go'] } }),
+    /gate\.commands/
+  );
+
+  // Una entrada con | produce un error que nombra gate.commands
+  assert.throws(
+    () => validateConfig({ ...DEFAULTS, gate: { ...DEFAULTS.gate, commands: ['go test | x'] } }),
+    /gate\.commands/
+  );
+});
+
 // Limpieza
 try {
   fs.rmSync(tmpBase, { recursive: true, force: true });
