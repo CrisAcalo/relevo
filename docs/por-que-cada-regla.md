@@ -26,6 +26,15 @@ Decisiones posibles: `allow` (se ejecuta), `deny` (se bloquea con el motivo) y `
 
 Límite conocido: la puerta compara texto. Un comando envuelto de otra forma puede esquivarla; no es un sandbox. La forma canónica cierra las variantes habituales, pero no todas: por ejemplo, una ruta escapada con acentos graves de PowerShell sigue en `ask` (`Start-Process` se deniega siempre desde el 2026-11-11). Se acepta porque trabaja junto con el worktree, la configuración global de agy y la auditoría de Claude, que revisa los `ask` en `gate.log`.
 
+La puerta protege de errores de un agente que trabaja de buena fe, no de uno que intente engañarla. Por eso se aceptan como límite conocido, sin regla propia, las formas ofuscadas que encontró QA el 2026-11-17 (veredictos en `artifacts/qa-gate-separadores2/`):
+- comillas tipográficas de PowerShell (`& “git.exe” push`);
+- `$(…)` dentro de comillas (`echo "$(chrome.exe) --headless"`);
+- comillas escapadas con acento grave que desplazan el emparejamiento;
+- `powershell "start calc"` o `cmd /c"start calc"` sin espacio;
+- subexpresiones pegadas a una palabra (`cat foo(Remove-Item b)`).
+
+Dan `ask` o `allow` en lugar de `deny`. Con `always-proceed` se ejecutarían, pero ningún agente escribe así sus comandos habituales.
+
 ## `relevo check`
 
 No ejecuta suites: comprueba que el ciclo se cumplió.
