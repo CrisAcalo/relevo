@@ -96,6 +96,19 @@ test('(h) con RELEVO_CODEX_CONFIG hacia un archivo vacío, con --sandbox read-on
   assert.ok(res.stderr.includes('--cwd no existe'), `esperaba que stderr contuviera '--cwd no existe', pero fue: ${res.stderr}`);
 });
 
+test('(i) sin --provider usa agy por defecto y falla en --brief si no existe', () => {
+  const res = spawnSync(
+    process.execPath,
+    [path.resolve(__dirname, '../lib/run.cjs'), '--task', 'tarea-valida', '--brief', 'no-existe-relevo-brief.md'],
+    {
+      cwd: path.resolve(__dirname, '..'),
+      encoding: 'utf8',
+    }
+  );
+  assert.ok(!res.stderr.includes('--provider debe ser uno de'), `esperaba que stderr no contuviera '--provider debe ser uno de', pero fue: ${res.stderr}`);
+  assert.ok(res.stderr.includes('--brief debe apuntar a un archivo'), `esperaba que stderr contuviera '--brief debe apuntar a un archivo', pero fue: ${res.stderr}`);
+});
+
 try {
   fs.rmSync(encargo, { force: true });
   fs.rmSync(bypassDir, { recursive: true, force: true });

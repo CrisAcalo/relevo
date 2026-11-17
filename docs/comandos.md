@@ -1,5 +1,7 @@
 # Comandos de relevo
 
+`relevo <comando> --help` muestra el uso sin ejecutar nada.
+
 `node <ruta-a-relevo>/bin/relevo.cjs <comando>` (o `relevo <comando>` con `npm link`). Se ejecutan desde la raíz del repositorio del proyecto; desde un worktree, relevo calcula la raíz principal.
 
 | Comando | Qué hace | Escribe |
@@ -27,7 +29,7 @@ relevo run --provider agy --role coder --model gemini-3.8-flash-high \
 
 | Opción | Descripción |
 |---|---|
-| `--provider` | `agy` o `codex`. |
+| `--provider` | `agy` (por defecto) o `codex`; `codex` solo con autorización explícita del usuario. |
 | `--role` | `coder`, `qa`, `docs`, `vision`, `research` o `review`; la puerta limita qué archivos puede editar. Con agy, los roles `qa` y `docs` usan el agente del proyecto `.agents/agents/qa.md` o `documentalista.md` si existe (`--agent` lo sustituye). |
 | `--model` | Modelo del proveedor. |
 | `--task` | Nombre de la tarea (letras, números y guiones). |
