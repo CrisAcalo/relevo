@@ -869,5 +869,55 @@ test('la puerta divide los segmentos en & solo y en saltos de línea con gate.co
   fs.rmSync(tempRepo, { recursive: true, force: true });
 });
 
+test('la puerta divide los segmentos también en \\r solo', () => {
+  const cases = [
+    ["cat README.md\rRemove-Item lib/x.cjs", 'ask'],
+    ["git status\rRemove-Item lib/x.cjs", 'ask'],
+    ["cat README.md\rgit status", 'allow'],
+  ];
+
+  for (const [command, expected] of cases) {
+    const res = run(command);
+    assert.equal(res, expected, `Esperaba ${expected} para "${command.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}" pero fue ${res}`);
+  }
+});
+
+test('la puerta rechaza comandos formados solo por separadores', () => {
+  const cases = [
+    [';', 'ask'],
+    ['&', 'ask'],
+    [' ; & ', 'ask'],
+  ];
+
+  for (const [command, expected] of cases) {
+    const res = run(command);
+    assert.equal(res, expected, `Esperaba ${expected} para "${command.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}" pero fue ${res}`);
+  }
+});
+
+test('la puerta divide los segmentos en \\r solo con gate.commands', () => {
+  const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-test-commands-cr-'));
+  const hooksDir = path.join(tempRepo, '.agents', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tempGatePath = path.join(hooksDir, 'permission-gate.cjs');
+  fs.copyFileSync(gatePath, tempGatePath);
+  const { decide: tempDecide } = require(tempGatePath);
+
+  fs.writeFileSync(path.join(tempRepo, 'relevo.config.json'), JSON.stringify({
+    gate: { commands: ['go test'] },
+  }));
+
+  const cases = [
+    ["go test ./...\rRemove-Item x", 'ask'],
+  ];
+
+  for (const [command, expected] of cases) {
+    const res = tempDecide({ toolCall: { name: 'run_command', args: { CommandLine: command } } }, {});
+    assert.equal(res.decision, expected, `Esperaba ${expected} para "${command.replace(/\r/g, '\\r').replace(/\n/g, '\\n')}" pero fue ${res.decision}`);
+  }
+
+  fs.rmSync(tempRepo, { recursive: true, force: true });
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
