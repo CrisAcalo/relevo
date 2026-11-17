@@ -965,5 +965,34 @@ for (const [command, expected] of pruebasSubexpresiones) {
   });
 }
 
+const pruebasQASeparadores = [
+  ['& { start notepad.exe }', 'deny'],
+  ['echo 1 | % { start notepad.exe }', 'deny'],
+  ['echo 1 | ForEach-Object { start notepad.exe }', 'deny'],
+  ['& {start-process notepad.exe}', 'deny'],
+  ['& {saps notepad.exe}', 'deny'],
+  ['& {rm -rf tmp}', 'deny'],
+  ['& {Remove-Item -Recurse tmp}', 'deny'],
+  ['(start notepad.exe)', 'deny'],
+  // Prueba del auditor: el navegador dentro de la subexpresión se lanza sin --headless; solo el corte en paréntesis lo ve.
+  ['cat (chrome.exe) --headless', 'deny'],
+  ['echo (msedge) --headless', 'deny'],
+  ['(Get-Item README.md).FullName', 'allow'],
+  ['rg "(foo|bar)" src', 'allow'],
+  ['cat "a" & start calc', 'deny'],
+  ['"cat x\nstart calc"', 'deny'],
+  ['cmd /c "dir & start calc"', 'deny'],
+];
+
+for (const [command, expected] of pruebasQASeparadores) {
+  test(`(qa-separadores) ${command.replace(/\r/g, '\\r').replace(/\n/g, '\\n')} -> ${expected}`, () => {
+    assert.equal(run(command), expected);
+  });
+}
+
+test('(qa-separadores) chrome.exe --dump-dom "https://ejemplo.test/?a=1&b=2" --headless -> no deny', () => {
+  assert.notEqual(run('chrome.exe --dump-dom "https://ejemplo.test/?a=1&b=2" --headless'), 'deny');
+});
+
 console.log(`\nagy permission gate: ${passed} passed, ${failures.length} failed.`);
 if (failures.length) process.exitCode = 1;
